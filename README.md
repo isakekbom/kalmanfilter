@@ -5,12 +5,13 @@ Python/JAX implementation of the term-structure model in
 [`docs/model_spec.md`](docs/model_spec.md); the implementation sequence is in
 [`roadmap.md`](roadmap.md).
 
-The package includes the issue #2 foundation and the mathematical OIS pricing
-kernel from equations (8)–(10). See [the OIS API and input contracts](docs/ois.md)
-for explicit instrument data, state Jacobians, and checked JAX compilation.
-Structural matrices, the EKF, likelihood evaluation, parameter transforms,
-synthetic time series, and optimization are not implemented. The specification's
-financial conventions and factor-construction questions remain unresolved.
+The package includes the issue #2 foundation, the [OIS pricing kernel and state
+Jacobians](docs/ois.md) from equations (8)–(10), and the [structural matrix
+layer](docs/transition.md) from issue #4. Structural steps use explicit coordinate
+identities and active observations, retaining compact selector/diagonal storage.
+The EKF, likelihood evaluation, parameter transforms, synthetic time series, and
+optimization are not implemented. Financial conventions, factor construction,
+and state lifecycle questions remain unresolved.
 
 ## Reproducible setup
 
@@ -132,7 +133,9 @@ calculation. Dimension tests cover the documented state decomposition, changing
 per-time counts, zero counts, and invalid metadata. These are infrastructure
 checks. The OIS tests additionally compare the analytical gradient, JAX autodiff,
 and central finite differences on deterministic algebraic examples with different
-payment counts. They do not select unresolved financial conventions.
+payment counts. Structural tests cover changing coordinate identities and shapes,
+active observation ordering, covariance mappings, compact storage, and checked
+JIT for individual steps. They do not select unresolved financial conventions.
 
 ## Package layout and scope
 
@@ -141,7 +144,7 @@ src/kalmanfilter/
     __init__.py     # Central JAX X64 configuration and public metadata type
     model.py        # ModelDimensions: counts for one observation time
     ois.py          # Explicit OIS inputs, pricing, and state derivatives
-    transition.py   # Reserved for issue #4
+    transition.py   # Named structural maps, transitions, and noise covariance maps
     ekf.py          # Reserved for issue #5
     likelihood.py   # Reserved for issue #6
     params.py       # Reserved for issue #7
@@ -150,9 +153,11 @@ tests/
     test_smoke.py
     test_model.py
     test_ois.py
+    test_transition.py
 docs/
     model_spec.md
     ois.md
+    transition.md
 ```
 
 `ModelDimensions` takes required keyword arguments `n_p_t`, `n_c_t`, `n_u_t`, and
