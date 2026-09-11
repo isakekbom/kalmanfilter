@@ -1,16 +1,16 @@
 # kalmanfilter
 
-Python/JAX project skeleton for the term-structure model in
+Python/JAX implementation of the term-structure model in
 [`kalmanRante.pdf`](kalmanRante.pdf). The current mathematical specification is
 [`docs/model_spec.md`](docs/model_spec.md); the implementation sequence is in
 [`roadmap.md`](roadmap.md).
 
-This checkout completes the foundation in
-[issue #2](https://github.com/isakekbom/kalmanfilter/issues/2): packaging,
-precision configuration, dimension metadata, and tests. OIS pricing, structural
-matrix construction, the EKF, likelihood evaluation, parameter transforms,
-synthetic generation, and optimization are not implemented. The specification's
-open questions remain unresolved.
+The package includes the issue #2 foundation and the mathematical OIS pricing
+kernel from equations (8)–(10). See [the OIS API and input contracts](docs/ois.md)
+for explicit instrument data, state Jacobians, and checked JAX compilation.
+Structural matrices, the EKF, likelihood evaluation, parameter transforms,
+synthetic time series, and optimization are not implemented. The specification's
+financial conventions and factor-construction questions remain unresolved.
 
 ## Reproducible setup
 
@@ -130,7 +130,9 @@ initially disabled, and check that root/submodule imports enable it. They also
 import each skeleton module and execute a small float64 CPU JIT/autodiff
 calculation. Dimension tests cover the documented state decomposition, changing
 per-time counts, zero counts, and invalid metadata. These are infrastructure
-checks, not tests of the financial model or its unresolved assumptions.
+checks. The OIS tests additionally compare the analytical gradient, JAX autodiff,
+and central finite differences on deterministic algebraic examples with different
+payment counts. They do not select unresolved financial conventions.
 
 ## Package layout and scope
 
@@ -138,7 +140,7 @@ checks, not tests of the financial model or its unresolved assumptions.
 src/kalmanfilter/
     __init__.py     # Central JAX X64 configuration and public metadata type
     model.py        # ModelDimensions: counts for one observation time
-    ois.py          # Reserved for issue #3
+    ois.py          # Explicit OIS inputs, pricing, and state derivatives
     transition.py   # Reserved for issue #4
     ekf.py          # Reserved for issue #5
     likelihood.py   # Reserved for issue #6
@@ -147,8 +149,10 @@ src/kalmanfilter/
 tests/
     test_smoke.py
     test_model.py
+    test_ois.py
 docs/
     model_spec.md
+    ois.md
 ```
 
 `ModelDimensions` takes required keyword arguments `n_p_t`, `n_c_t`, `n_u_t`, and
