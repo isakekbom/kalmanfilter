@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling==1.32.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kalmanfilter"
+version = "0.1.0"
+description = "Python/JAX foundation for the term-structure model in kalmanRante.pdf"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["jax==0.11.1"]
+
+[project.optional-dependencies]
+test = ["pytest==9.1.1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kalmanfilter"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib", "--strict-config", "--strict-markers"]
