@@ -7,11 +7,13 @@ Python/JAX implementation of the term-structure model in
 
 The package includes the issue #2 foundation, the [OIS pricing kernel and state
 Jacobians](docs/ois.md) from equations (8)–(10), and the [structural matrix
-layer](docs/transition.md) from issue #4. Structural steps use explicit coordinate
-identities and active observations, retaining compact selector/diagonal storage.
-The EKF, likelihood evaluation, parameter transforms, synthetic time series, and
-optimization are not implemented. Financial conventions, factor construction,
-and state lifecycle questions remain unresolved.
+layer](docs/transition.md) from issue #4. The [forward Extended Kalman Filter](docs/ekf.md)
+implements equations (38)–(56), with Cholesky gain solves, optional equation-level
+traces, and support for changing state dimensions and empty observation sets.
+Structural steps use explicit coordinate identities and active observations,
+retaining compact selector/diagonal storage. Likelihood evaluation, parameter
+transforms, synthetic time series, and optimization are not implemented. Financial
+conventions, factor construction, and state lifecycle questions remain unresolved.
 
 ## Reproducible setup
 
@@ -135,7 +137,10 @@ checks. The OIS tests additionally compare the analytical gradient, JAX autodiff
 and central finite differences on deterministic algebraic examples with different
 payment counts. Structural tests cover changing coordinate identities and shapes,
 active observation ordering, covariance mappings, compact storage, and checked
-JIT for individual steps. They do not select unresolved financial conventions.
+JIT for individual steps. EKF tests cover independent linear/OIS references,
+equation equivalence, changing dimensions, empty observations, covariance
+diagnostics, checked Cholesky failure, and differentiation through a fixed step.
+They do not select unresolved financial conventions.
 
 ## Package layout and scope
 
@@ -145,7 +150,7 @@ src/kalmanfilter/
     model.py        # ModelDimensions: counts for one observation time
     ois.py          # Explicit OIS inputs, pricing, and state derivatives
     transition.py   # Named structural maps, transitions, and noise covariance maps
-    ekf.py          # Reserved for issue #5
+    ekf.py          # Forward EKF, Cholesky updates, and optional equation-level traces
     likelihood.py   # Reserved for issue #6
     params.py       # Reserved for issue #7
     synthetic.py    # Reserved for issue #9
@@ -154,10 +159,12 @@ tests/
     test_model.py
     test_ois.py
     test_transition.py
+    test_ekf.py
 docs/
     model_spec.md
     ois.md
     transition.md
+    ekf.md
 ```
 
 `ModelDimensions` takes required keyword arguments `n_p_t`, `n_c_t`, `n_u_t`, and
