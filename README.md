@@ -11,9 +11,11 @@ layer](docs/transition.md) from issue #4. The [forward Extended Kalman Filter](d
 implements equations (38)–(56), with Cholesky gain solves, optional equation-level
 traces, and support for changing state dimensions and empty observation sets.
 Structural steps use explicit coordinate identities and active observations,
-retaining compact selector/diagonal storage. Likelihood evaluation, parameter
-transforms, synthetic time series, and optimization are not implemented. Financial
-conventions, factor construction, and state lifecycle questions remain unresolved.
+retaining compact selector/diagonal storage. The [innovation log-likelihood](docs/likelihood.md)
+implements equation (57), reusing EKF Cholesky factors and retaining per-date
+contributions with optional traces. Parameter transforms, synthetic time series,
+and optimization are not implemented. Financial conventions, factor construction,
+and state lifecycle questions remain unresolved.
 
 ## Reproducible setup
 
@@ -151,7 +153,7 @@ src/kalmanfilter/
     ois.py          # Explicit OIS inputs, pricing, and state derivatives
     transition.py   # Named structural maps, transitions, and noise covariance maps
     ekf.py          # Forward EKF, Cholesky updates, and optional equation-level traces
-    likelihood.py   # Reserved for issue #6
+    likelihood.py   # Innovation log-likelihood from EKF factors and per-date terms
     params.py       # Reserved for issue #7
     synthetic.py    # Reserved for issue #9
 tests/
@@ -160,11 +162,13 @@ tests/
     test_ois.py
     test_transition.py
     test_ekf.py
+    test_likelihood.py
 docs/
     model_spec.md
     ois.md
     transition.md
     ekf.md
+    likelihood.md
 ```
 
 `ModelDimensions` takes required keyword arguments `n_p_t`, `n_c_t`, `n_u_t`, and
