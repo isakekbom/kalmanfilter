@@ -13,8 +13,11 @@ traces, and support for changing state dimensions and empty observation sets.
 Structural steps use explicit coordinate identities and active observations,
 retaining compact selector/diagonal storage. The [innovation log-likelihood](docs/likelihood.md)
 implements equation (57), reusing EKF Cholesky factors and retaining per-date
-contributions with optional traces. Parameter transforms, synthetic time series,
-and optimization are not implemented. Financial conventions, factor construction,
+contributions with optional traces. The [parameter transforms](docs/params.md)
+map a flat float64 vector to the six mathematical blocks, with compact positive
+variances, a Cholesky initial covariance, and identity transition parameters by
+default. Full likelihood gradient validation, synthetic time series, and
+optimization are not implemented. Financial conventions, factor construction,
 and state lifecycle questions remain unresolved.
 
 ## Reproducible setup
@@ -154,7 +157,7 @@ src/kalmanfilter/
     transition.py   # Named structural maps, transitions, and noise covariance maps
     ekf.py          # Forward EKF, Cholesky updates, and optional equation-level traces
     likelihood.py   # Innovation log-likelihood from EKF factors and per-date terms
-    params.py       # Reserved for issue #7
+    params.py       # Explicit flat parameter layout and JAX transforms/inverses
     synthetic.py    # Reserved for issue #9
 tests/
     test_smoke.py
@@ -163,12 +166,14 @@ tests/
     test_transition.py
     test_ekf.py
     test_likelihood.py
+    test_params.py
 docs/
     model_spec.md
     ois.md
     transition.md
     ekf.md
     likelihood.md
+    params.md
 ```
 
 `ModelDimensions` takes required keyword arguments `n_p_t`, `n_c_t`, `n_u_t`, and
