@@ -179,10 +179,6 @@ def _initial_covariance(raw: Array, layout: ParameterLayout) -> Array:
     # The Gram product is mathematically symmetric. Average floating-point drift
     # for the existing EKF's exact-symmetry boundary; this is not a PSD repair.
     covariance = 0.5 * covariance + 0.5 * covariance.T
-    if layout.n_x0:
-        # Positive L guarantees SPD in exact arithmetic. This validation catches
-        # loss of that property when the dense product is rounded/underflows.
-        _checked_cholesky(covariance, "constructed Sigma_0")
     return covariance
 
 
@@ -190,8 +186,9 @@ def unpack_parameters(raw_vector: ArrayLike, layout: ParameterLayout) -> ModelPa
     """Transform flat raw coordinates in explicit PDF order to model parameters.
 
     Variance blocks use softplus directly (not squared). The initial covariance
-    uses a lower factor with softplus diagonals and raw off-diagonals. Checked
-    underflow/overflow or loss of numerical SPD invalidates returned values.
+    uses a lower factor with softplus diagonals and raw off-diagonals. Softplus
+    underflow and covariance overflow are checked. Positive definiteness follows
+    from the factor construction in exact arithmetic, without refactorization.
     """
     if not isinstance(layout, ParameterLayout):
         raise TypeError("layout must be ParameterLayout")

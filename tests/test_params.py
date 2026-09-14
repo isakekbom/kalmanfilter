@@ -199,6 +199,28 @@ def test_fixed_layout_checked_jit_pack_unpack_and_gradient_smoke(mode):
     np.testing.assert_allclose(compiled_gradient, gradient, rtol=2e-14, atol=2e-14)
 
 
+def test_forward_unpack_and_gradient_avoid_cholesky(monkeypatch):
+    configuration = layout(2, 2, 1, 3, 2)
+    raw = jnp.linspace(-0.4, 0.4, configuration.n_parameters)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("forward parameters must not refactor the Gram product")
+
+    monkeypatch.setattr(params_module.jnp.linalg, "cholesky", forbidden)
+    eager = unpack_parameters(raw, configuration)
+    # Fresh wrappers force tracing while the factorization guard is active.
+    error, compiled = jax.jit(checkify.checkify(
+        lambda vector: unpack_parameters(vector, configuration)
+    ))(raw)
+    error.throw()
+    assert_parameters_close(compiled, eager, rtol=2e-14, atol=2e-15)
+    diagnostic = lambda vector: jnp.sum(unpack_parameters(vector, configuration).sigma_0)
+    error, (value, gradient) = jax.jit(checkify.checkify(jax.value_and_grad(diagnostic)))(raw)
+    error.throw()
+    assert np.isfinite(value) and np.all(np.isfinite(gradient))
+    assert gradient.shape == raw.shape and gradient.dtype == jnp.float64
+
+
 def test_empty_layout_avoids_cholesky_and_supports_checked_jit(monkeypatch):
     configuration = layout(0, 0, 0, 0, 0)
 
@@ -373,7 +395,6 @@ def test_unit_interval_pack_rejects_endpoints_and_outside(theta_f):
     ("sigma_w", -1000, "softplus underflow"),
     ("sigma_v", -1000, "softplus underflow"),
     ("sigma_0", -1000, "softplus underflow"),
-    ("sigma_0", -500, "Cholesky failed"),  # L>0 but L@L.T underflows to zero.
     ("sigma_0", 1e200, "Sigma_0 must be finite"),
     ("theta_f", -1000, "floating-point saturation"),
     ("theta_f", 100, "floating-point saturation"),
@@ -383,6 +404,20 @@ def test_unrepresentable_extremes_fail_instead_of_clipping(field, value, message
     raw = jnp.zeros(configuration.n_parameters).at[getattr(configuration.slices, field).start].set(value)
     error, _ = jax.jit(checkify.checkify(unpack_parameters))(raw, configuration)
     with pytest.raises(checkify.JaxRuntimeError, match=message):
+        error.throw()
+
+
+def test_finite_gram_underflow_is_not_repaired_or_refactorized_forward():
+    configuration = layout(0, 0, 0, 1, 0)
+    raw = array([0, -500])
+    assert jax.nn.softplus(raw[1]) > 0
+    error, p = jax.jit(checkify.checkify(unpack_parameters))(raw, configuration)
+    error.throw()
+    assert np.all(np.isfinite(p.sigma_0))
+    np.testing.assert_array_equal(p.sigma_0, [[0]])
+    # The externally supplied covariance still must pass the inverse SPD check.
+    error, _ = jax.jit(checkify.checkify(pack_parameters))(p, configuration)
+    with pytest.raises(checkify.JaxRuntimeError, match="Cholesky failed"):
         error.throw()
 
 

@@ -116,12 +116,13 @@ entries directly or imposing a stationary initial distribution.
 
 The computed Gram product is averaged with its transpose to make floating-point
 symmetry exact for the existing EKF input contract. This averages only symmetry
-roundoff; it does not establish or repair positive definiteness. For nonempty
-initial spaces, the forward transform also checks a JAX Cholesky factorization
-of the computed dense product to detect loss of numerical positive definiteness.
-That validation does not change the returned covariance. It costs one initial
-covariance factorization per unpack operation, separate from the EKF's per-date
-innovation factorizations.
+roundoff; it does not establish or repair positive definiteness. The forward
+transform checks finite raw coordinates, strictly positive softplus diagonals,
+and a finite Gram product. It relies on the factor construction for positive
+definiteness in exact arithmetic and performs no Cholesky factorization. This
+avoids a redundant $O(n_{x0}^3)$ factorization in each future likelihood and
+gradient evaluation. Cholesky validation belongs to the inverse path, where
+the covariance is supplied externally.
 
 To pack a supplied initial covariance:
 
@@ -168,10 +169,13 @@ mathematical block's shape. Static layout/type/shape mistakes raise
 `TypeError`/`ValueError`; numerical validity uses the project's `checkify` protocol.
 
 Mathematical positivity does not imply unrestricted machine representability.
-Very negative softplus arguments can underflow to zero; sigmoid can round to
-zero or one; squaring tiny factor diagonals can underflow; huge factors can
-overflow the covariance; and rounding an ill-conditioned Gram product can lose
-positive definiteness. These failures are reported, not clipped or repaired.
+Very negative softplus arguments can underflow to zero, sigmoid can round to
+zero or one, and huge factors can overflow the covariance. These failures are
+reported, not clipped or repaired. Squaring tiny positive factor diagonals can
+also underflow to a finite zero, and rounding an ill-conditioned Gram product
+can lose positive definiteness. The forward transform does not separately test
+the resulting covariance for positive definiteness; a singular or indefinite
+covariance will fail Cholesky if subsequently supplied to the inverse transform.
 Round-trip accuracy is therefore claimed for representable, suitably conditioned
 interior values, not after information has been lost to underflow or saturation.
 Inverse logit is also sensitive near endpoints. No impossible exact recovery
