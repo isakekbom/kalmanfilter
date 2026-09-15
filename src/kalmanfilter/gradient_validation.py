@@ -164,7 +164,7 @@ def directional_central_difference(
 def gradient_errors(automatic: ArrayLike, numerical: ArrayLike) -> GradientErrors:
     """abs(AD-FD) and abs(AD-FD)/max(abs(AD),abs(FD)); both zero gives zero.
 
-    No acceptance tolerance is built in. Apply abs(AD-FD) <= atol+rtol*abs(FD)
+    No acceptance tolerance is built in. Apply abs(AD-FD) <= atol+rtol*abs(AD)
     externally, so a near-zero derivative is assessed using absolute error too.
     """
     automatic = _real64(automatic, "automatic gradient", 1)
