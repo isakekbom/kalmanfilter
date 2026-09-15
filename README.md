@@ -16,8 +16,11 @@ implements equation (57), reusing EKF Cholesky factors and retaining per-date
 contributions with optional traces. The [parameter transforms](docs/params.md)
 map a flat float64 vector to the six mathematical blocks, with compact positive
 variances, a Cholesky initial covariance, and identity transition parameters by
-default. Full likelihood gradient validation, synthetic time series, and
-optimization are not implemented. Financial conventions, factor construction,
+default. [Full likelihood gradient validation](docs/gradient_validation.md)
+compares the complete raw-vector derivative against independent central finite
+differences and directional derivatives on controlled nonlinear EKF cases.
+The synthetic data generator (#9), optimization (#10), and MATLAB/reference
+parity (#12) are not implemented. Financial conventions, factor construction,
 and state lifecycle questions remain unresolved.
 
 ## Reproducible setup
@@ -158,6 +161,7 @@ src/kalmanfilter/
     ekf.py          # Forward EKF, Cholesky updates, and optional equation-level traces
     likelihood.py   # Innovation log-likelihood from EKF factors and per-date terms
     params.py       # Explicit flat parameter layout and JAX transforms/inverses
+    gradient_validation.py  # Raw-vector NLL and independent derivative diagnostics
     synthetic.py    # Reserved for issue #9
 tests/
     test_smoke.py
@@ -167,6 +171,7 @@ tests/
     test_ekf.py
     test_likelihood.py
     test_params.py
+    test_gradient_validation.py
 docs/
     model_spec.md
     ois.md
@@ -174,6 +179,7 @@ docs/
     ekf.md
     likelihood.md
     params.md
+    gradient_validation.md
 ```
 
 `ModelDimensions` takes required keyword arguments `n_p_t`, `n_c_t`, `n_u_t`, and

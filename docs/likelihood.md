@@ -236,8 +236,9 @@ assert value.dtype == gradient.dtype == jnp.float64
 | Implementation convention | Reusing the existing factor and trace objects, immutable result layout, float64/checkify validation, explicit zero contribution for empty dates, failure without repair, and Python-loop accumulation. |
 | Still unresolved | Joint noise assumptions (Q7), financial/coordinate construction and parameter-sharing questions, estimation/initial-condition choices (Q9), and broader admissibility/optimizer failure policy (Q10). |
 
-Full-vector gradient validation is deferred to issue #8; this issue includes
-only a small single-parameter consistency test. Parameter transforms, optimizer
+Full-vector gradient validation is implemented separately in
+[issue #8](gradient_validation.md); this issue includes only a small
+single-parameter consistency test. Parameter transforms, optimizer
 algorithms, Hessians, benchmarks, synthetic time-series generation, MATLAB
 parity, and the noisy-optimization draft remain outside scope.
 
