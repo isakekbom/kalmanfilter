@@ -166,6 +166,21 @@ Measure:
 
 Report JIT compile cost separately from steady-state runtime.
 
+## #23 Make fixed-dimension EKF likelihood scalable to long time series
+https://github.com/isakekbom/kalmanfilter/issues/23
+
+Added after #10 exposed a compilation scaling risk: its historical 24-date
+Python-loop value/gradient first call took approximately 152 seconds. Preserve
+that baseline and the general ragged drivers, and add an explicit `jax.lax.scan`
+path for fixed structural segments. Batch numerical time data outside the
+differentiated objective; reuse the existing EKF/likelihood kernels. Establish
+state, covariance, innovation, raw-gradient and optimizer parity before measuring
+first-call and warmed evaluation times through at least 1000 and preferably 5000
+dates. See [fixed scan execution and measurements](docs/fixed_scan_scaling.md).
+
+Automatic regime segmentation, padding, lifecycle inference and global parameter
+tying remain outside this issue. Complete this scalability work before #11.
+
 ---
 
 # Phase 4 — External parity when reference implementation arrives
@@ -186,7 +201,7 @@ If MATLAB parity reveals a mismatch, fix the core model and add regression tests
 ## #11 Implement and evaluate the noisy-optimization method from section 3
 https://github.com/isakekbom/kalmanfilter/issues/11
 
-Depends on #10 and should ideally also wait for #12 if the reference implementation becomes available soon.
+Depends on #10 and the subsequent #23 scalability work, and should ideally also wait for #12 if the reference implementation becomes available soon.
 
 Implement equations (58)–(97) as an isolated research module. Compare it with standard optimizers using the same validated EKF objective and gradient.
 
@@ -214,7 +229,7 @@ A practical order for Codex is:
 
 #5 + #6 → #12 MATLAB parity   [blocked until reference available]
 
-#10 → #11 noisy optimization experiment
+#10 → #23 fixed-shape scan scalability → #11 noisy optimization experiment
 ```
 
 # Definition of "baseline model complete"

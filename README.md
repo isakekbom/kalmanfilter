@@ -24,7 +24,10 @@ an exact linear Gaussian reference, nonlinear state tracking and likelihood
 comparisons, and changing dimensions with missing observations.
 [Baseline optimization](docs/baseline_optimization.md) (#10) supports BFGS,
 L-BFGS-B, and diagnostic gradient descent with checked JAX gradients, explicit
-multiple starts, and separate compilation/optimization timing. Noisy optimization
+multiple starts, and separate compilation/optimization timing. An explicit
+[fixed-shape scan likelihood](docs/fixed_scan_scaling.md) (#23) batches a constant
+structural segment for `jax.lax.scan`, while the general Python drivers retain
+support for changing coordinates and ragged observations. Noisy optimization
 (#11) is not implemented; MATLAB/reference parity (#12) remains blocked by
 missing reference material. Financial conventions, factor construction, and
 state lifecycle questions remain unresolved.
@@ -170,6 +173,7 @@ src/kalmanfilter/
     gradient_validation.py  # Raw-vector NLL and independent derivative diagnostics
     synthetic.py    # Explicit seeded state/noise/observation truth and EKF inputs
     optimization.py # Host optimizer boundary, checked JAX gradients, and run traces
+    fixed_scan.py   # Explicit batched likelihood for fixed structural segments
 tests/
     test_smoke.py
     test_model.py
@@ -181,6 +185,7 @@ tests/
     test_gradient_validation.py
     test_synthetic.py
     test_optimization.py
+    test_fixed_scan.py
 docs/
     model_spec.md
     ois.md
@@ -191,11 +196,14 @@ docs/
     gradient_validation.md
     synthetic.md
     baseline_optimization.md
+    fixed_scan_scaling.md
 examples/
     synthetic_validation.py  # One-command generation, EKF, and likelihood
 benchmarks/
     baseline_optimization.py # Fixed synthetic estimation and method comparison
     results/baseline_optimization.txt
+    fixed_scan_scaling.py    # Checked JIT and warmed gradients through 5000 dates
+    results/fixed_scan_scaling.txt
 ```
 
 `ModelDimensions` takes required keyword arguments `n_p_t`, `n_c_t`, `n_u_t`, and

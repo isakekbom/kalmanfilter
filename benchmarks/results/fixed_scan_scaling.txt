@@ -1,0 +1,32 @@
+Platform: Windows-11-10.0.26100-SP0; Python 3.12.14; JAX 0.11.1; NumPy 2.5.3; SciPy 1.18.1
+Device: cpu:0; float64=True; seed=20261010
+Model: one PCA state, two nonlinear OIS quotes; issue #10 convention.
+Fixed initial mean=[0.35], covariance=[[0.0025]], process variance=[0.0025].
+Evaluate generating raw: phi=0.9, observation variances=[0.0004,0.0009], theta_g=0.8.
+Generating 5000 genuine synthetic dates once; all shorter runs use prefixes.
+Setup complete; generation/stacking excluded from timings. Plain scan; no remat.
+Trace parity T=1,5,24,100; rtol=2e-12, atol=2e-13; maximum absolute differences:
+  predicted_state: 9.71445146547e-17
+  predicted_covariance: 4.33680868994e-19
+  filtered_state: 1.11022302463e-16
+  filtered_covariance: 4.33680868994e-19
+  innovation: 4.4408920985e-16
+  innovation_covariance: 2.42861286637e-17
+  per_step_LL: 1.15463194561e-14
+  total_LL: 0
+First call includes tracing, compilation and synchronized evaluation; warmed median/min of 10 calls.
+path T first_checked_JIT_seconds warm_median_seconds warm_min_seconds NLL gradient_norm2
+python 12 28.637555 0.000582 0.000535 -29.790125532172 4.4345275
+scan 12 1.324498 0.000418 0.000379 -29.790125532172 4.4345275
+Raw parity T=12, four vectors: max_NLL_abs=0; max_gradient_abs=8.52651282912e-14; gradient rtol=2e-11, atol=2e-12
+BFGS parity T=12, maxiter=200, gtol=1e-6; NLL atol=2e-10; parameter rtol=2e-7, atol=2e-9:
+  start=0 python_NLL=-32.109410137131 scan_NLL=-32.109410137131 NLL_abs=7.1054273576e-15 parameter_max_abs=2.36477504245e-14 python_grad2=1.40719101e-07 scan_grad2=1.40716348e-07
+    scan fitted phi=[0.98403341], variances=[0.00038391 0.00322639], theta_g=[0.71793493]
+  start=1 python_NLL=-32.109410137131 scan_NLL=-32.109410137131 NLL_abs=7.1054273576e-15 parameter_max_abs=2.22044604925e-16 python_grad2=4.2475112e-07 scan_grad2=4.24751146e-07
+    scan fitted phi=[0.98403342], variances=[0.00038391 0.00322639], theta_g=[0.71793493]
+scan 24 1.490371 0.001403 0.001250 -65.952564789478 5.50793591
+scan 100 1.404441 0.003660 0.003343 -295.333854419180 16.3599895
+scan 500 1.489420 0.015212 0.014191 -1503.751513092756 52.9751374
+scan 1000 1.289984 0.028603 0.026491 -2942.174893965414 53.9315216
+scan 5000 1.542488 0.145484 0.140491 -14566.021803085849 114.417784
+T=5000 checked value-and-gradient succeeded. No checkpoint/remat was needed.
