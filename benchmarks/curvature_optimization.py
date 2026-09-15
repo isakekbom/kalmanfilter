@@ -195,7 +195,7 @@ def hessian_diagnostics(hessian):
 
 def report_hessian(problem, dense, label, point):
     diagnostics = hessian_diagnostics(dense(point))
-    blocks = {name: [part.start, part.stop] for name, part in problem.layout.slices.items() if part.stop > part.start}
+    blocks = {name: [part.start, part.stop] for name, part in problem.layout.slices._asdict().items() if part.stop > part.start}
     masses = {name: float(np.sum(diagnostics["minimum_eigenvector"][start:stop] ** 2))
               for name, (start, stop) in blocks.items()}
     emit("HESSIAN", problem=problem.name, point=label, raw=point, blocks=blocks,
