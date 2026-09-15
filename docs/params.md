@@ -265,4 +265,5 @@ NumPy covariance references/eigenvalues, compact variances, checked failures,
 float64 limits, static pytrees, JIT, and gradients through every transform block.
 The raw-vector-to-likelihood derivative test here is a small smoke test only.
 [Issue #8](gradient_validation.md) separately validates full likelihood gradients;
-optimization, Hessians, synthetic series, and estimation remain later work.
+[issue #9](synthetic.md) provides synthetic series at the mathematical-parameter
+level. Optimization, Hessians, and estimation remain later work.

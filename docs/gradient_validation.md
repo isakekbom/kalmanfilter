@@ -33,7 +33,9 @@ returning an initial `FilterState` and a sequence of `EKFInputs`. It explicitly
 supplies coordinate maps, observations, and instruments. The parameter layer
 does not learn coordinate identities, select parameter sharing, or resolve Q4.
 No global market-data object, automatic tying, master-state padding, optimizer,
-Hessian, or synthetic-series generator is introduced.
+Hessian, or synthetic-series generator is introduced by the gradient module.
+[Issue #9](synthetic.md) separately provides synthetic generation from explicit
+mathematical parameters per date.
 
 ## Independent numerical methodology
 
