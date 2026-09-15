@@ -19,9 +19,12 @@ variances, a Cholesky initial covariance, and identity transition parameters by
 default. [Full likelihood gradient validation](docs/gradient_validation.md)
 compares the complete raw-vector derivative against independent central finite
 differences and directional derivatives on controlled nonlinear EKF cases.
-The synthetic data generator (#9), optimization (#10), and MATLAB/reference
-parity (#12) are not implemented. Financial conventions, factor construction,
-and state lifecycle questions remain unresolved.
+[Synthetic generation and end-to-end validation](docs/synthetic.md) (#9) cover
+an exact linear Gaussian reference, nonlinear state tracking and likelihood
+comparisons, and changing dimensions with missing observations. Optimization
+(#10) is not implemented; MATLAB/reference parity (#12) remains blocked by
+missing reference material. Financial conventions, factor construction, and
+state lifecycle questions remain unresolved.
 
 ## Reproducible setup
 
@@ -162,7 +165,7 @@ src/kalmanfilter/
     likelihood.py   # Innovation log-likelihood from EKF factors and per-date terms
     params.py       # Explicit flat parameter layout and JAX transforms/inverses
     gradient_validation.py  # Raw-vector NLL and independent derivative diagnostics
-    synthetic.py    # Reserved for issue #9
+    synthetic.py    # Explicit seeded state/noise/observation truth and EKF inputs
 tests/
     test_smoke.py
     test_model.py
@@ -172,6 +175,7 @@ tests/
     test_likelihood.py
     test_params.py
     test_gradient_validation.py
+    test_synthetic.py
 docs/
     model_spec.md
     ois.md
@@ -180,6 +184,9 @@ docs/
     likelihood.md
     params.md
     gradient_validation.md
+    synthetic.md
+examples/
+    synthetic_validation.py  # One-command generation, EKF, and likelihood
 ```
 
 `ModelDimensions` takes required keyword arguments `n_p_t`, `n_c_t`, `n_u_t`, and
@@ -190,7 +197,6 @@ cross-time mapping, parameter dimension, array padding, covariance structure, or
 missing-observation behavior is imposed. Representing a zero count is metadata,
 not a decision about how a future filter processes an empty observation set.
 
-The reserved modules contain documentation only. Future differentiable numerical
-functions belong in these modules and should use JAX with explicit inputs and
-outputs. File reading, market-data parsing, and other I/O belong outside them.
+Numerical functions use JAX with explicit inputs and outputs. File reading,
+market-data parsing, and other I/O belong outside the numerical modules.
 No optimizer dependency or experimental optimization framework is included.
