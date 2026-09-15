@@ -325,8 +325,9 @@ four-date changing sequence with reordering, immutable traces, float64,
 checked JIT, independent step finite differences, strict input validation,
 symmetry diagnostics, singular/indefinite/nonfinite S, invalid Cholesky diagonal
 reporting, tiny positive S without floors, and compact F/Q/R use. Source checks
-guard against explicit inverses, NumPy imports, and callbacks in production.
-NumPy is used only for independent test references.
+guard against explicit inverses and callbacks in production, and NumPy imports
+in mathematical model modules. NumPy is permitted at the separate
+[optimizer host boundary](baseline_optimization.md) and in independent tests.
 
 Run the complete suite:
 

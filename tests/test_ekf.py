@@ -517,14 +517,15 @@ def test_compact_path_materializes_only_observation_selector(monkeypatch):
     assert isinstance(result.update.observation_covariance, DiagonalMatrix)
 
 
-def test_production_has_no_inverse_numpy_or_callback_calls():
+def test_production_has_no_inverse_callbacks_or_numpy_in_mathematical_modules():
     for path in Path(ekf.__file__).parent.glob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Call):
                 name = getattr(node.func, "attr", getattr(node.func, "id", ""))
                 assert name not in {"inv", "pinv", "inverse", "matrix_power", "pure_callback", "io_callback"}, path
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
+            # Issue #10 explicitly permits NumPy only at the host optimizer boundary.
+            if path.name != "optimization.py" and isinstance(node, (ast.Import, ast.ImportFrom)):
                 names = [alias.name for alias in node.names] if isinstance(node, ast.Import) else [node.module or ""]
                 assert all(name != "numpy" and not name.startswith("numpy.") for name in names), path
 

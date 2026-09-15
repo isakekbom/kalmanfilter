@@ -81,6 +81,8 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "jax" },
+    { name = "numpy" },
+    { name = "scipy" },
 ]
 
 [package.optional-dependencies]
@@ -91,7 +93,9 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "jax", specifier = "==0.11.1" },
+    { name = "numpy", specifier = "==2.5.3" },
     { name = "pytest", marker = "extra == 'test'", specifier = "==9.1.1" },
+    { name = "scipy", specifier = "==1.18.1" },
 ]
 provides-extras = ["test"]
 

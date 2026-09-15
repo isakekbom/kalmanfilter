@@ -271,5 +271,6 @@ uv run --locked --extra test pytest --basetemp .pytest_tmp -p no:cacheprovider
 The measured agreement strongly supports correctness of the reverse-mode
 derivative path on these controlled nonlinear cases. It does **not** establish
 identifiability, good conditioning of a 20-year real-data likelihood, or easy
-optimization. Synthetic-series generation/recovery (#9), optimization (#10),
-and MATLAB/reference parity (#12) remain later work.
+optimization. [Synthetic validation](synthetic.md) (#9) and
+[baseline optimization](baseline_optimization.md) (#10) are implemented separately.
+MATLAB/reference parity (#12) remains blocked by missing reference material.

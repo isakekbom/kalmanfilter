@@ -12,7 +12,7 @@ $$
 vector to `ModelParameters`. `pack_parameters(parameters, layout)` provides
 the inverse for initialization and debugging. This module implements transforms;
 [full likelihood gradient validation](gradient_validation.md) is separate.
-Optimization remains unimplemented.
+[Baseline optimization](baseline_optimization.md) operates on these raw coordinates.
 
 ## Source status
 
@@ -266,4 +266,5 @@ float64 limits, static pytrees, JIT, and gradients through every transform block
 The raw-vector-to-likelihood derivative test here is a small smoke test only.
 [Issue #8](gradient_validation.md) separately validates full likelihood gradients;
 [issue #9](synthetic.md) provides synthetic series at the mathematical-parameter
-level. Optimization, Hessians, and estimation remain later work.
+level. [Issue #10](baseline_optimization.md) adds baseline synthetic estimation;
+Hessian studies and noisy optimization remain later work.

@@ -1,0 +1,70 @@
+Platform: Windows-11-10.0.26100-SP0; Python 3.12.14; JAX 0.11.1; NumPy 2.5.3; SciPy 1.18.1
+Seed=20261010; dates=24; raw order=(phi, variance_a, variance_b, theta_g)
+Generating raw: [ 2.19722458 -7.823846   -7.01266576  0.8       ]
+Fixed initial mean=[0.35], covariance=[[0.0025]], process variance=[0.0025]
+Generating estimated parameters: phi=[0.9], observation variances=[0.0004,0.0009], theta_g=[0.8]
+Start 0: [ 2.44722458 -7.623846   -7.21266576  0.9       ]
+Start 1: [ 1.39722458 -7.023846   -7.61266576  0.6       ]
+Start 2: [ 3.19722458 -8.823846   -6.01266576  1.1       ]
+Compiling one checked value-and-gradient function...
+Shared first-call/JIT seconds: 152.273925; generating-truth NLL: -65.952564789478
+All methods: maxiter=200, gtol=1e-6; L-BFGS-B ftol=1e-12; GD fixed learning_rate=1e-4
+method start initial_NLL final_NLL final_grad2 iterations actual_f/g solver_f/g steady_seconds success status
+BFGS 0 -65.915597969 -66.733096254 4.90901917e-07 16 20/20 20/20 0.026932 True 0
+  reason: Optimization terminated successfully.
+  phi: [0.94351276] observation variances: [0.00039542 0.00029201] theta_g: [0.8147514] process variance (fixed): [0.0025]
+  absolute errors: phi= [0.04351276] observation variances= [4.57936090e-06 6.07986971e-04] theta_g= [0.0147514]
+  relative observation-variance errors: [0.0114484  0.67554108]
+  initial grad2=6.78672586; NLL reduction=0.817498285; raw distance to generating vector=1.28467272
+BFGS 1 -44.377498104 -66.733096254 8.27453465e-07 24 31/31 31/31 0.042236 True 0
+  reason: Optimization terminated successfully.
+  phi: [0.94351276] observation variances: [0.00039542 0.00029201] theta_g: [0.8147514] process variance (fixed): [0.0025]
+  absolute errors: phi= [0.04351276] observation variances= [4.57938452e-06 6.07986583e-04] theta_g= [0.0147514]
+  relative observation-variance errors: [0.01144846 0.67554065]
+  initial grad2=119.925039; NLL reduction=22.355598149; raw distance to generating vector=1.28467155
+BFGS 2 -62.759064368 -66.733096254 4.38946353e-07 16 20/20 20/20 0.022388 True 0
+  reason: Optimization terminated successfully.
+  phi: [0.94351275] observation variances: [0.00039542 0.00029201] theta_g: [0.81475141] process variance (fixed): [0.0025]
+  absolute errors: phi= [0.04351275] observation variances= [4.57935831e-06 6.07987041e-04] theta_g= [0.01475141]
+  relative observation-variance errors: [0.0114484  0.67554116]
+  initial grad2=13.9406809; NLL reduction=3.974031886; raw distance to generating vector=1.28467288
+BFGS best start: 2
+L-BFGS-B 0 -65.915597969 -66.733096254 1.1543566e-05 21 25/25 25/25 0.044698 True 0
+  reason: CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH
+  phi: [0.9435128] observation variances: [0.00039542 0.00029201] theta_g: [0.81475155] process variance (fixed): [0.0025]
+  absolute errors: phi= [0.0435128] observation variances= [4.57920246e-06 6.07992194e-04] theta_g= [0.01475155]
+  relative observation-variance errors: [0.01144801 0.67554688]
+  initial grad2=6.78672586; NLL reduction=0.817498285; raw distance to generating vector=1.28468874
+L-BFGS-B 1 -44.377498104 -66.733096254 6.85586818e-08 23 28/28 28/28 0.036241 True 0
+  reason: CONVERGENCE: NORM OF PROJECTED GRADIENT <= PGTOL
+  phi: [0.94351276] observation variances: [0.00039542 0.00029201] theta_g: [0.8147514] process variance (fixed): [0.0025]
+  absolute errors: phi= [0.04351276] observation variances= [4.57938639e-06 6.07986869e-04] theta_g= [0.0147514]
+  relative observation-variance errors: [0.01144847 0.67554097]
+  initial grad2=119.925039; NLL reduction=22.355598149; raw distance to generating vector=1.28467239
+L-BFGS-B 2 -62.759064368 -66.733096254 9.90008257e-07 21 25/25 25/25 0.035739 True 0
+  reason: CONVERGENCE: NORM OF PROJECTED GRADIENT <= PGTOL
+  phi: [0.94351276] observation variances: [0.00039542 0.00029201] theta_g: [0.81475141] process variance (fixed): [0.0025]
+  absolute errors: phi= [0.04351276] observation variances= [4.57937295e-06 6.07987020e-04] theta_g= [0.01475141]
+  relative observation-variance errors: [0.01144843 0.67554113]
+  initial grad2=13.9406809; NLL reduction=3.974031886; raw distance to generating vector=1.28467286
+L-BFGS-B best start: 1
+GD 0 -65.915597969 -66.292966491 2.618297 200 201/201 None/None 0.238454 False 1
+  reason: Maximum iterations reached.
+  phi: [0.92160419] observation variances: [0.0004668  0.00073246] theta_g: [0.83458754] process variance (fixed): [0.0025]
+  absolute errors: phi= [0.02160419] observation variances= [6.67963236e-05 1.67542253e-04] theta_g= [0.03458754]
+  relative observation-variance errors: [0.16699081 0.18615806]
+  initial grad2=6.78672586; NLL reduction=0.377368522; raw distance to generating vector=0.372658399
+GD 1 -44.377498104 -61.323087969 9.46009397 200 201/201 None/None 0.219706 False 1
+  reason: Maximum iterations reached.
+  phi: [0.83640567] observation variances: [0.00079064 0.00049148] theta_g: [0.91711789] process variance (fixed): [0.0025]
+  absolute errors: phi= [0.06359433] observation variances= [0.00039064 0.00040852] theta_g= [0.11711789]
+  relative observation-variance errors: [0.97659881 0.45390759]
+  initial grad2=119.925039; NLL reduction=16.945589865; raw distance to generating vector=1.0790188
+GD 2 -62.759064368 -65.233989521 7.19347354 200 201/201 None/None 0.202324 False 1
+  reason: Maximum iterations reached.
+  phi: [0.96030295] observation variances: [0.00015434 0.0025156 ] theta_g: [0.88862697] process variance (fixed): [0.0025]
+  absolute errors: phi= [0.06030295] observation variances= [0.00024566 0.0016156 ] theta_g= [0.08862697]
+  relative observation-variance errors: [0.61415959 1.7951063 ]
+  initial grad2=13.9406809; NLL reduction=2.474925154; raw distance to generating vector=1.71779632
+GD best start: 0
+Total actual compiled evaluations (includes one warmup and one truth diagnostic): 754
