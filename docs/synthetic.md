@@ -245,5 +245,6 @@ construction, global parameter tying (Q4), lifecycle timing (Q5), missing-data
 interpretation (Q6), and joint-noise assumptions (Q7) remain unresolved.
 Synthetic agreement does **not** establish the supervisor's MATLAB interpretation
 or reference parity (#12), which remains blocked by missing reference material.
-Full gradient validation (#8) remains implemented. Optimization and parameter
-recovery by estimation (#10) are still not implemented.
+Full gradient validation (#8) remains implemented.
+[Baseline optimization and synthetic estimation](baseline_optimization.md) (#10)
+are implemented separately; the generator itself performs no optimization.

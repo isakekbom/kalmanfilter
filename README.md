@@ -21,8 +21,11 @@ compares the complete raw-vector derivative against independent central finite
 differences and directional derivatives on controlled nonlinear EKF cases.
 [Synthetic generation and end-to-end validation](docs/synthetic.md) (#9) cover
 an exact linear Gaussian reference, nonlinear state tracking and likelihood
-comparisons, and changing dimensions with missing observations. Optimization
-(#10) is not implemented; MATLAB/reference parity (#12) remains blocked by
+comparisons, and changing dimensions with missing observations.
+[Baseline optimization](docs/baseline_optimization.md) (#10) supports BFGS,
+L-BFGS-B, and diagnostic gradient descent with checked JAX gradients, explicit
+multiple starts, and separate compilation/optimization timing. Noisy optimization
+(#11) is not implemented; MATLAB/reference parity (#12) remains blocked by
 missing reference material. Financial conventions, factor construction, and
 state lifecycle questions remain unresolved.
 
@@ -166,6 +169,7 @@ src/kalmanfilter/
     params.py       # Explicit flat parameter layout and JAX transforms/inverses
     gradient_validation.py  # Raw-vector NLL and independent derivative diagnostics
     synthetic.py    # Explicit seeded state/noise/observation truth and EKF inputs
+    optimization.py # Host optimizer boundary, checked JAX gradients, and run traces
 tests/
     test_smoke.py
     test_model.py
@@ -176,6 +180,7 @@ tests/
     test_params.py
     test_gradient_validation.py
     test_synthetic.py
+    test_optimization.py
 docs/
     model_spec.md
     ois.md
@@ -185,8 +190,12 @@ docs/
     params.md
     gradient_validation.md
     synthetic.md
+    baseline_optimization.md
 examples/
     synthetic_validation.py  # One-command generation, EKF, and likelihood
+benchmarks/
+    baseline_optimization.py # Fixed synthetic estimation and method comparison
+    results/baseline_optimization.txt
 ```
 
 `ModelDimensions` takes required keyword arguments `n_p_t`, `n_c_t`, `n_u_t`, and
@@ -197,6 +206,7 @@ cross-time mapping, parameter dimension, array padding, covariance structure, or
 missing-observation behavior is imposed. Representing a zero count is metadata,
 not a decision about how a future filter processes an empty observation set.
 
-Numerical functions use JAX with explicit inputs and outputs. File reading,
-market-data parsing, and other I/O belong outside the numerical modules.
-No optimizer dependency or experimental optimization framework is included.
+Mathematical model functions use JAX with explicit inputs and outputs. The
+optimizer host boundary uses NumPy/SciPy. File reading and market-data parsing
+belong outside the numerical model modules. The section 3 experimental
+optimization framework remains unimplemented.

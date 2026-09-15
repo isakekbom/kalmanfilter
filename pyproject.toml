@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Python/JAX foundation for the term-structure model in kalmanRante.pdf"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["jax==0.11.1"]
+dependencies = ["jax==0.11.1", "numpy==2.5.3", "scipy==1.18.1"]
 
 [project.optional-dependencies]
 test = ["pytest==9.1.1"]
