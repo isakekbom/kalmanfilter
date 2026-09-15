@@ -1,7 +1,6 @@
 """Independent function-value derivatives of the complete raw-vector NLL."""
 
 import ast
-from dataclasses import replace
 from pathlib import Path
 
 import jax
@@ -16,9 +15,8 @@ from kalmanfilter.gradient_validation import (
     central_difference_gradient, directional_central_difference, gradient_errors,
     raw_negative_log_likelihood,
 )
-from kalmanfilter.likelihood import run_likelihood
 from kalmanfilter.ois import OISInstrument
-from kalmanfilter.params import ParameterLayout, unpack_parameters
+from kalmanfilter.params import ParameterLayout
 from kalmanfilter.transition import StateCoordinates, StructuralStep, selection_map
 
 
@@ -126,6 +124,10 @@ def test_full_raw_vector_gradients_and_component_reports(measurements):
                   f"AD={automatic[worst]:.12e} FD={numerical.gradient[worst]:.12e}; "
                   f"rel={errors.max_relative:.9e} at {worst_relative}/{block_name(configuration, worst_relative)}")
             np.testing.assert_allclose(numerical.steps, h * np.maximum(1, np.abs(raw)), rtol=1e-15)
+            if h == 1e-5:
+                # The measured stable region; all 11 raw coordinates must agree.
+                np.testing.assert_allclose(numerical.gradient, automatic, rtol=1e-8, atol=5e-9,
+                                           err_msg=f"{mode} case={case_index}, h={h}")
             for name, block in zip(configuration.slices._fields, configuration.slices, strict=True):
                 block_errors = gradient_errors(automatic[block], numerical.gradient[block])
                 assert np.all(np.abs(automatic[block]) > 1e-6), f"inactive block: {name}"
@@ -141,6 +143,10 @@ def test_full_gradient_directional_reports(measurements):
                 errors = gradient_errors(jnp.atleast_1d(ad_directional), jnp.atleast_1d(numerical.derivative))
                 np.testing.assert_allclose(np.linalg.norm(numerical.direction), 1, rtol=2e-15)
                 assert np.all(numerical.direction != 0)
+                if h == 1e-5:
+                    np.testing.assert_allclose(numerical.derivative, ad_directional,
+                                               rtol=1e-8, atol=1e-9,
+                                               err_msg=f"{mode} case={case_index}, direction={direction_index}")
                 print(f"\n{mode} case={case_index} direction={direction_index} h={h:.0e}: "
                       f"AD={ad_directional:.12e} FD={numerical.derivative:.12e} "
                       f"abs={errors.max_absolute:.9e} rel={errors.max_relative:.9e}")
@@ -184,3 +190,32 @@ def test_gradient_errors_have_true_relative_errors_and_both_zero_convention():
     empty = gradient_errors([], [])
     assert empty.max_absolute == empty.max_relative == 0
     assert empty.worst_absolute_index is empty.worst_relative_index is None
+
+
+def test_invalid_raw_point_propagates_checked_objective_and_gradient_failure():
+    configuration = make_layout()
+
+    def objective(raw):
+        return raw_negative_log_likelihood(raw, configuration, build_problem)
+
+    invalid_raw = raw_cases()[0].at[configuration.slices.sigma_w.start].set(-1000)
+    checked = jax.jit(checkify.checkify(jax.value_and_grad(objective)))
+    error, _ = checked(invalid_raw)  # All returned numerical outputs are invalid.
+    with pytest.raises(checkify.JaxRuntimeError, match="process variances.*softplus underflow"):
+        error.throw()
+
+
+def test_validation_module_contains_no_optimizer():
+    tree = ast.parse(Path(validation.__file__).read_text(encoding="utf-8"))
+    forbidden_calls = {"minimize", "bfgs", "lbfgs", "lbfgsb", "gradientdescent"}
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            modules = ([alias.name for alias in node.names] if isinstance(node, ast.Import)
+                       else [node.module or ""])
+            assert not any(module == "scipy.optimize" or module.startswith("scipy.optimize.")
+                           or module.split(".")[0] in {"jaxopt", "optax"} for module in modules)
+            if isinstance(node, ast.ImportFrom) and node.module == "scipy":
+                assert all(alias.name != "optimize" for alias in node.names)
+        if isinstance(node, ast.Call):
+            name = getattr(node.func, "attr", getattr(node.func, "id", ""))
+            assert name.lower().replace("_", "").replace("-", "") not in forbidden_calls

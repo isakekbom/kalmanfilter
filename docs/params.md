@@ -10,8 +10,9 @@ $$
 
 `unpack_parameters(raw_vector, layout)` maps one flat optimizer-coordinate
 vector to `ModelParameters`. `pack_parameters(parameters, layout)` provides
-the inverse for initialization and debugging. This implements transforms only;
-optimization and full likelihood gradient validation remain unimplemented.
+the inverse for initialization and debugging. This module implements transforms;
+[full likelihood gradient validation](gradient_validation.md) is separate.
+Optimization remains unimplemented.
 
 ## Source status
 
@@ -262,6 +263,6 @@ unresolved; no automatic parameter tying or lifecycle rules are introduced.
 Tests cover both inverse directions, explicit ordering, independent small
 NumPy covariance references/eigenvalues, compact variances, checked failures,
 float64 limits, static pytrees, JIT, and gradients through every transform block.
-The raw-vector-to-likelihood derivative test is a small smoke test only. Full
-likelihood gradient validation belongs to issue #8; optimization, Hessians,
-synthetic series, and estimation remain later work.
+The raw-vector-to-likelihood derivative test here is a small smoke test only.
+[Issue #8](gradient_validation.md) separately validates full likelihood gradients;
+optimization, Hessians, synthetic series, and estimation remain later work.
