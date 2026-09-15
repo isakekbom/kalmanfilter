@@ -181,6 +181,21 @@ dates. See [fixed scan execution and measurements](docs/fixed_scan_scaling.md).
 Automatic regime segmentation, padding, lifecycle inference and global parameter
 tying remain outside this issue. Complete this scalability work before #11.
 
+## #25 Benchmark curvature-aware optimizers and diagnose likelihood conditioning
+https://github.com/isakekbom/kalmanfilter/issues/25
+
+Depends on #10 and #23. Strengthen the deterministic baseline before #11 using
+exact checked JAX Hessian-vector products for Newton-CG and trust-krylov, while
+preserving BFGS, L-BFGS-B and GD. Validate second derivatives independently,
+inspect small diagnostic Hessians at generating/starting/fitted points, and
+separate derivative compilation, warmed calls and optimizer cost across time
+lengths and controlled parameter dimensions. See
+[curvature optimization and conditioning](docs/curvature_optimization.md).
+
+Local curvature findings do not establish global optimality or formal
+identifiability. Keep dense diagnostic Hessians out of the optimizer interface;
+retain strict numerical failures and existing model/parameter semantics.
+
 ---
 
 # Phase 4 — External parity when reference implementation arrives
@@ -201,7 +216,7 @@ If MATLAB parity reveals a mismatch, fix the core model and add regression tests
 ## #11 Implement and evaluate the noisy-optimization method from section 3
 https://github.com/isakekbom/kalmanfilter/issues/11
 
-Depends on #10 and the subsequent #23 scalability work, and should ideally also wait for #12 if the reference implementation becomes available soon.
+Depends on #10, #23 scalability and #25 curvature/conditioning baselines, and should ideally also wait for #12 if the reference implementation becomes available soon.
 
 Implement equations (58)–(97) as an isolated research module. Compare it with standard optimizers using the same validated EKF objective and gradient.
 
@@ -229,7 +244,7 @@ A practical order for Codex is:
 
 #5 + #6 → #12 MATLAB parity   [blocked until reference available]
 
-#10 → #23 fixed-shape scan scalability → #11 noisy optimization experiment
+#10 → #23 fixed-shape scan scalability → #25 curvature/conditioning → #11 noisy optimization experiment
 ```
 
 # Definition of "baseline model complete"

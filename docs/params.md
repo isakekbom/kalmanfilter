@@ -267,4 +267,5 @@ The raw-vector-to-likelihood derivative test here is a small smoke test only.
 [Issue #8](gradient_validation.md) separately validates full likelihood gradients;
 [issue #9](synthetic.md) provides synthetic series at the mathematical-parameter
 level. [Issue #10](baseline_optimization.md) adds baseline synthetic estimation;
-Hessian studies and noisy optimization remain later work.
+[Issue #25](curvature_optimization.md) studies raw-coordinate curvature;
+noisy optimization remains later work.

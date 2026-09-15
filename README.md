@@ -27,7 +27,10 @@ L-BFGS-B, and diagnostic gradient descent with checked JAX gradients, explicit
 multiple starts, and separate compilation/optimization timing. An explicit
 [fixed-shape scan likelihood](docs/fixed_scan_scaling.md) (#23) batches a constant
 structural segment for `jax.lax.scan`, while the general Python drivers retain
-support for changing coordinates and ragged observations. Noisy optimization
+support for changing coordinates and ragged observations.
+[Curvature-aware optimization and conditioning](docs/curvature_optimization.md)
+(#25) adds checked JAX Hessian-vector products for Newton-CG/trust-krylov and
+benchmarks local curvature and scaling alongside the existing methods. Noisy optimization
 (#11) is not implemented; MATLAB/reference parity (#12) remains blocked by
 missing reference material. Financial conventions, factor construction, and
 state lifecycle questions remain unresolved.
@@ -186,6 +189,7 @@ tests/
     test_synthetic.py
     test_optimization.py
     test_fixed_scan.py
+    test_curvature_optimization.py
 docs/
     model_spec.md
     ois.md
@@ -197,6 +201,7 @@ docs/
     synthetic.md
     baseline_optimization.md
     fixed_scan_scaling.md
+    curvature_optimization.md
 examples/
     synthetic_validation.py  # One-command generation, EKF, and likelihood
 benchmarks/
@@ -204,6 +209,8 @@ benchmarks/
     results/baseline_optimization.txt
     fixed_scan_scaling.py    # Checked JIT and warmed gradients through 5000 dates
     results/fixed_scan_scaling.txt
+    curvature_optimization.py # HVP validation, solver comparisons, local Hessians
+    results/curvature_optimization.txt
 ```
 
 `ModelDimensions` takes required keyword arguments `n_p_t`, `n_c_t`, `n_u_t`, and
