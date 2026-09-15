@@ -151,8 +151,49 @@ benchmark objective for Python time loops/comprehensions and verifies it runs
 without invoking the setup stacker. Existing ragged tests and source modules
 remain unchanged. There are no wall-clock assertions in pytest.
 
-Measured discrepancies and optimizer results are recorded below after the
-benchmark completes.
+### Measured trace and raw-gradient parity
+
+The saved benchmark output reports the following maximum absolute differences
+over **T=1,5,24,100** on the one-PCA, two-quote model from #10. These are measured
+maxima for that benchmark; the larger four-state CI case described above is
+separately checked against the same trace tolerances.
+
+| Quantity | Maximum absolute difference |
+| --- | ---: |
+| Predicted state | 9.71445146547e-17 |
+| Predicted covariance | 4.33680868994e-19 |
+| Filtered state | 1.11022302463e-16 |
+| Filtered covariance | 4.33680868994e-19 |
+| Innovation | 4.4408920985e-16 |
+| Innovation covariance | 2.42861286637e-17 |
+| Per-step log-likelihood | 1.15463194561e-14 |
+| Total log-likelihood | 0 |
+
+At T=12, the generating raw vector and three perturbed vectors gave maximum
+absolute **raw NLL discrepancy 0** and **gradient component discrepancy
+8.52651282912e-14**. Both objectives use the same parameter transform and checked
+`jax.value_and_grad` path; scan changes only time execution and representation.
+
+### Measured BFGS parity
+
+Both paths succeeded from both starts and reached final NLL
+**-32.109410137131** (rounded to 12 decimals).
+
+| Start | Absolute final NLL difference | Maximum absolute mathematical parameter difference | Python gradient norm | Scan gradient norm |
+| --- | ---: | ---: | ---: | ---: |
+| 0 | 7.1054273576e-15 | 2.36477504245e-14 | 1.40719101e-7 | 1.40716348e-7 |
+| 1 | 7.1054273576e-15 | 2.22044604925e-16 | 4.2475112e-7 | 4.24751146e-7 |
+
+The fitted scan parameters, at the precision printed by the benchmark, were:
+
+| Start | Persistence | Observation variances | `theta_g` |
+| --- | ---: | --- | ---: |
+| 0 | 0.98403341 | [0.00038391, 0.00322639] | 0.71793493 |
+| 1 | 0.98403342 | [0.00038391, 0.00322639] | 0.71793493 |
+
+Parameter discrepancies above use the unrounded mathematical arrays, not these
+printed values. Initial mean 0.35, initial variance 0.0025 and process variance
+0.0025 remain fixed in this explicit synthetic convention.
 
 ## Reproduction and measured scaling
 
@@ -162,6 +203,12 @@ uv run --locked --extra test pytest --basetemp .pytest_tmp -p no:cacheprovider
 uv run --locked python benchmarks/fixed_scan_scaling.py
 git diff --check
 ```
+
+The completion validation run on 2026-09-16 passed **53 focused tests** in
+91.18 seconds and **489 full-suite tests** in 154.06 seconds using the exact
+pytest commands above. The full suite includes the unchanged 436-test baseline.
+`git diff --check` also passed. These durations describe test runs, not the
+benchmark timing measurements below.
 
 The benchmark uses seed 20261010 and generates 5000 genuine dates with the
 existing synthetic generator once. Shorter runs use prefixes. Generation and
@@ -180,14 +227,36 @@ caches; numbers describe the reported process, not isolated fresh processes.
 
 Exact stdout is saved in
 [benchmarks/results/fixed_scan_scaling.txt](../benchmarks/results/fixed_scan_scaling.txt).
-Timing and numerical result tables will be populated from that output.
+The run used Windows 11 (10.0.26100), CPU device `cpu:0`, Python 3.12.14,
+JAX 0.11.1 with float64 enabled, NumPy 2.5.3 and SciPy 1.18.1.
+
+| Path | T | First checked JIT value+gradient (s) | Warmed median (s) | Warmed minimum (s) |
+| --- | ---: | ---: | ---: | ---: |
+| Python | 12 | 28.637555 | 0.000582 | 0.000535 |
+| Scan | 12 | 1.324498 | 0.000418 | 0.000379 |
+| Scan | 24 | 1.490371 | 0.001403 | 0.001250 |
+| Scan | 100 | 1.404441 | 0.003660 | 0.003343 |
+| Scan | 500 | 1.489420 | 0.015212 | 0.014191 |
+| Scan | 1000 | 1.289984 | 0.028603 | 0.026491 |
+| Scan | 5000 | 1.542488 | 0.145484 | 0.140491 |
+
+The current-run comparison at **T=12** uses the same model, data, raw vector
+and machine for both paths. The old **152.273925 s at T=24** is historical #10
+data, not a fresh apples-to-apples comparison with the scan T=24 row. It is not
+used to calculate a current-machine speedup.
+
+In this run, scan first-call times ranged from 1.289984 to 1.542488 seconds over
+T=12 through T=5000; warmed evaluation time increased with the time-series
+length. **T=5000 successfully evaluated the checked value and gradient without
+remat/checkpointing**, yielding NLL -14566.021803085849 and gradient norm
+114.417784. No memory failure was observed; peak memory was not measured.
 
 ## Limits
 
 This establishes a fixed-shape primitive on modest state/observation dimensions,
 not calibration on market data or large-matrix scalability. Reverse-mode memory
 usage, backend and device behavior, and structural regime segmentation require
-separate investigation. No checkpoint/rematerialization option is added unless
-a concrete long-series failure makes it necessary. The general Python driver
+separate investigation. No checkpoint/rematerialization option was needed or
+added for the measured 5000-date run. The general Python driver
 remains the route for changing structure. #11 stays future research work; #12
 remains blocked on MATLAB/reference material.
