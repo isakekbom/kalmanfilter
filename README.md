@@ -90,6 +90,46 @@ The equivalent module invocation is `uv run --locked --extra test python -m pyte
 For a fresh environment without deleting an existing `.venv`, select another
 environment directory before running the same sync and test commands:
 
+### Windows ARM64
+
+On Windows ARM64, use the x64 Python build for this project. The current JAX
+dependencies do not provide the required ARM64 wheels, so Windows runs the x64
+build through emulation. Install it with `winget` from PowerShell:
+
+```powershell
+winget install --id Python.Python.3.12 --exact --architecture x64 --scope user
+```
+
+Create the project environment with the installed x64 interpreter:
+
+```powershell
+$python = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe"
+Remove-Item -Recurse -Force .venv -ErrorAction SilentlyContinue
+& $python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[test]"
+```
+
+Run the tests directly from that environment:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+If Windows reports that a SciPy DLL was blocked, clear the downloaded-file
+marker and run the test command again:
+
+```powershell
+Get-ChildItem .venv -Recurse -File | Unblock-File
+.\.venv\Scripts\python.exe -m pytest
+```
+
+The first test run can take several minutes because JAX compiles numerical
+functions. Source changes are available immediately because the package is
+installed in editable mode.
+
+For a fresh environment without deleting an existing `.venv`, select another
+environment directory before running the same sync and test commands:
+
 ```powershell
 # Windows PowerShell; applies to this terminal session
 $env:UV_PROJECT_ENVIRONMENT = '.venv-clean'
