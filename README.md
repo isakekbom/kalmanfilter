@@ -1,6 +1,10 @@
-# kalmanfilter
+# KalmanFilter: Code Overview
 
-Python/JAX implementation of the term-structure model in
+_A Python/JAX implementation of a term-structure model._
+
+## Overview
+
+This repository contains a Python/JAX implementation of the term-structure model in
 [`kalmanRante.pdf`](kalmanRante.pdf). The current mathematical specification is
 [`docs/model_spec.md`](docs/model_spec.md); the implementation sequence is in
 [`roadmap.md`](roadmap.md).
@@ -34,6 +38,74 @@ benchmarks local curvature and scaling alongside the existing methods. Noisy opt
 (#11) is not implemented; MATLAB/reference parity (#12) remains blocked by
 missing reference material. Financial conventions, factor construction, and
 state lifecycle questions remain unresolved.
+
+## Getting started
+
+The usual first steps are:
+
+1. Install the required Python and project dependencies using the setup below.
+2. Run the test suite to verify the local environment.
+3. Read the relevant document in `docs/` before changing model behavior.
+4. Make changes on a feature branch and open a pull request for review.
+
+### Run tests
+
+From the repository root, run:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+The full suite contains numerical and JAX compilation tests. The first run can
+take several minutes; a successful run ends with a summary such as `489 passed`.
+For a focused check, pass a test file or keyword, for example:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_ois.py -q
+.\.venv\Scripts\python.exe -m pytest -k likelihood -q
+```
+
+### Run an example
+
+After installing the project, run the synthetic validation example with:
+
+```powershell
+.\.venv\Scripts\python.exe examples\synthetic_validation.py
+```
+
+### Development workflow
+
+Create a branch before making changes:
+
+```powershell
+git switch -c feature/short-description
+```
+
+Before opening a pull request, run the relevant tests and inspect the working
+tree:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+git status
+git diff
+```
+
+Keep commits focused and explain behavior changes in the pull request. Pull
+requests should include the tests that were run and any known limitations.
+
+## Project structure
+
+```text
+src/kalmanfilter/   Package implementation
+tests/              Unit, numerical, and integration tests
+docs/               Mathematical and implementation documentation
+examples/           Runnable validation examples
+benchmarks/         Benchmark scripts and recorded results
+roadmap.md          Planned work and unresolved questions
+```
+
+The module-level documentation in `docs/` is the source of truth for equations
+and model contracts. Update documentation and tests when those contracts change.
 
 ## Reproducible setup
 
