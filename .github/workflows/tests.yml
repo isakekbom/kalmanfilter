@@ -1,4 +1,4 @@
-name: Test suite
+name: Test suite (alla pytest körs nu, och måste vara OK innan merge till main)
 
 on:
   pull_request:
