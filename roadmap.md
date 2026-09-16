@@ -2,272 +2,273 @@
 
 This repository aims to reproduce and then extend the term-structure model described in `kalmanRante.pdf`.
 
-The current source of truth is **only the PDF**. We do not yet have the supervisor's MATLAB implementation or a reference dataset. Therefore the first objective is not to optimize the model; it is to reconstruct the mathematics carefully, implement a transparent baseline, and validate it on synthetic cases. MATLAB/reference parity comes later when those materials become available.
+The core Python/JAX implementation through deterministic parameter estimation is now in place. The next phase is team-oriented: several independent workstreams can proceed in parallel, but research/real-data claims must respect the dependency order below.
 
-## Core principle for Codex
+We still do **not** have a trusted supervisor MATLAB implementation/reference dataset in the repository. Synthetic validation remains the current internal reference. Any unresolved market/model convention must be documented rather than guessed.
 
-Work through the GitHub issues in dependency order. Do **not** jump directly to parameter optimization or the noisy-optimization section.
+## Core development rules
 
 For every issue:
 
-1. Read `kalmanRante.pdf`, `roadmap.md`, and the relevant prerequisite issues/docs.
-2. State any mathematical ambiguity explicitly instead of silently inventing a convention.
-3. Prefer small, testable functions whose names correspond to mathematical objects in the PDF.
-4. Use JAX with 64-bit floating-point precision for differentiable numerical code.
-5. Avoid explicit matrix inverses. Use linear solves / Cholesky factorizations where appropriate.
-6. Add tests as part of the same change.
-7. Preserve intermediate EKF quantities so later MATLAB parity debugging is possible.
-8. Keep experimental optimization code separate from the core state-space model.
-
-## Model summary
-
-The latent state is
-
-`x_t = (x_t^s, x_t^u)`
-
-where `x_t^s` contains systematic term-structure factors and `x_t^u` instrument-specific deviations. The systematic state is further split into principal-component factors and central-bank-step factors.
-
-The transition model is
-
-`x_t = F_t(theta_F) x_{t-1} + w_t`
-
-with
-
-`F_t(theta_F) = A_t diag(theta_F) B_t`.
-
-The observation model is nonlinear:
-
-`z_t = g_t(theta_g, x_t^s) + I^z_t x_t^u + v_t`.
-
-Therefore the implementation in equations (38)–(56) is an **Extended Kalman Filter (EKF)**: `g_t` is linearized around the predicted systematic state before the measurement update.
-
-The Gaussian innovation log-likelihood in equation (57) is the baseline objective for parameter estimation. Section 3, equations (58)–(97), is a separate draft method for handling noisy objective/gradient evaluations and should only be attempted after the baseline likelihood and gradients have been validated.
+1. Read `kalmanRante.pdf`, this roadmap, and prerequisite issue/docs.
+2. State mathematical ambiguity explicitly instead of silently inventing a convention.
+3. Prefer small, testable functions that map to mathematical objects.
+4. Use JAX float64 for differentiable numerical code.
+5. Avoid explicit matrix inverses; use solves/Cholesky factorizations.
+6. Add tests in the same PR.
+7. Preserve inspectable EKF intermediates for later parity work.
+8. Keep experimental/noisy optimization separate from the production EKF model.
+9. Preserve native numerical failures; do not hide them with clipping, jitter, finite penalties, or retries unless a separate issue explicitly justifies such behavior.
+10. Follow the blocker sections in GitHub issues before starting dependent work.
 
 ---
 
-# Phase 0 — Understand and scaffold
+# Completed foundation
 
-## #1 Reconstruct and document the mathematical model from `kalmanRante.pdf`
-https://github.com/isakekbom/kalmanfilter/issues/1
+## Phase 0 — Understand and scaffold
 
-**Priority: highest.**
+- **#1** Reconstruct/document the mathematical model — **completed**
+- **#2** Reproducible Python/JAX project skeleton — **completed**
 
-Deliver `docs/model_spec.md` containing notation, dimensions, assumptions, open questions, and a mapping from equations to implementation objects.
+## Phase 1 — Mathematical model
 
-Do not silently resolve ambiguous parts of the PDF.
+- **#3** OIS pricing function and Jacobian — **completed**
+- **#4** Time-varying structural matrices/maps — **completed**
+- **#5** Extended Kalman Filter recursion — **completed**
+- **#6** Stable innovation log-likelihood — **completed**
 
-## #2 Set up a reproducible Python/JAX project skeleton
-https://github.com/isakekbom/kalmanfilter/issues/2
+## Phase 2 — Parameterization and validation
 
-Can run in parallel with #1.
+- **#7** Constrained/raw parameterization — **completed**
+- **#8** Full-likelihood JAX gradient validation — **completed**
+- **#9** Synthetic generator/end-to-end validation — **completed**
 
-Target structure:
+## Phase 3 — Deterministic optimization baseline
 
-```text
-src/kalmanfilter/
-    __init__.py
-    model.py
-    ois.py
-    transition.py
-    ekf.py
-    likelihood.py
-    params.py
-    synthetic.py
-    optimization.py
+- **#10** Baseline ML optimization (BFGS/L-BFGS-B/GD) — **completed**
+- **#23** Fixed-shape `lax.scan` scaling to long time series — **completed**
+- **#25** Curvature-aware optimization/conditioning (Newton-CG, trust-krylov, HVPs) — **completed**
 
-tests/
-docs/
-```
-
-Use JAX float64 and pytest from the start.
+These completed issues establish the deterministic baseline used by all research work below.
 
 ---
 
-# Phase 1 — Implement the mathematical model
+# Current parallel workstreams
 
-## #3 Implement OIS pricing function `g_t` and its Jacobian
-https://github.com/isakekbom/kalmanfilter/issues/3
+After #25, the project deliberately branches into several parallel tracks.
 
-Depends on #1 and #2.
+## Track A — Numerical behavior and stronger deterministic diagnostics
 
-Implement equations (8)–(10), including discount factors and the nonlinear OIS quote function. Validate Jacobians against finite differences and, where practical, the analytical expression in the PDF.
+### #33 Characterize the numerical precision floor
+https://github.com/isakekbom/kalmanfilter/issues/33
 
-## #4 Implement time-varying transition and observation-selection matrices
-https://github.com/isakekbom/kalmanfilter/issues/4
+Purpose: measure when finite-precision error becomes material in objective/gradient differences instead of assuming that numerical noise is already the dominant problem.
 
-Depends on #1 and #2.
+**Blocked by:** #23, #25 (completed).
 
-Implement `A_t`, `B_t`, `D_t`, `I^z_t`, `G_t`, and `F_t(theta_F)`. The implementation must explicitly support changing state dimensions and missing observations.
+**Blocks:** #37, #39.
 
-## #5 Implement the Extended Kalman Filter recursion
-https://github.com/isakekbom/kalmanfilter/issues/5
+### #40 Evaluate parameter scaling/preconditioning
+https://github.com/isakekbom/kalmanfilter/issues/40
 
-Depends on #3 and #4.
+Purpose: separate poor coordinate scaling/conditioning from genuine finite-precision noise and establish the strongest fair deterministic baseline.
 
-Implement equations (38)–(56). Return a detailed optional trace containing predicted/filtered states, covariances, innovations, `H_t`, `S_t`, and other intermediate quantities.
+**Blocked by:** #25 (completed).
 
-**Do not use explicit matrix inverses.**
+**Blocks:** #39.
 
-## #6 Implement numerically stable innovation log-likelihood
-https://github.com/isakekbom/kalmanfilter/issues/6
+## Track B — Section 3 mathematical specification and controlled noisy experiments
 
-Depends on #5.
+### #34 Formalize PDF Section 3 mathematics
+https://github.com/isakekbom/kalmanfilter/issues/34
 
-Implement equation (57). Use Cholesky factorization for the log determinant and solves. Keep per-time-step likelihood contributions.
+Purpose: convert equations (58)–(97) into an implementation-ready dimensioned specification and list unresolved choices explicitly.
 
----
+**Blocked by:** #25 (completed).
 
-# Phase 2 — Parameterization and validation
+**Blocks:** #35, #37.
 
-## #7 Design constrained parameterization
-https://github.com/isakekbom/kalmanfilter/issues/7
+### #36 Build a controlled noisy objective/gradient harness
+https://github.com/isakekbom/kalmanfilter/issues/36
 
-Can begin after #1/#2 and should be complete before optimization.
+Purpose: create exact, seeded noise experiments where the true objective/gradient and optimum remain known.
 
-Map an unconstrained optimizer vector to valid
+**Blocked by:** #25 (completed).
 
-`theta = (theta_F, Sigma_w, Sigma_v, a_x, Sigma_0, theta_g)`.
+**Blocks:** #37, #39.
 
-Ensure covariance parameters remain valid by construction.
+### #35 Implement Section 3 algebra primitives
+https://github.com/isakekbom/kalmanfilter/issues/35
 
-## #9 Build synthetic data generator and end-to-end recovery tests
-https://github.com/isakekbom/kalmanfilter/issues/9
+Purpose: implement/test `vech`, local Taylor terms, `a/A/alpha/Sbar/y`, and stable solves independently of the outer algorithm.
 
-Depends on #3–#6.
+**Blocked by:** #34.
 
-Synthetic data is essential while the MATLAB implementation is unavailable. Include a linear sanity case, nonlinear OIS case, and a time-varying/missing-data case.
+**Blocks:** #37.
 
-## #8 Validate JAX autodiff gradients of the full likelihood
-https://github.com/isakekbom/kalmanfilter/issues/8
+### #37 Implement the Section 3 local quadratic/noise model
+https://github.com/isakekbom/kalmanfilter/issues/37
 
-Depends on #5, #6, #7.
+Purpose: assemble the local surrogate/noise model once its mathematics, numerical motivation, and controlled oracle are ready.
 
-Compare `jax.grad` / `jax.value_and_grad` against central finite differences and directional derivatives. Do not proceed to serious optimization until these checks pass.
+**Blocked by:** #33, #34, #35, #36.
 
----
+**Blocks:** #38, #39.
 
-# Phase 3 — Baseline parameter estimation
+### #38 Implement the Section 3 outer iteration/fixed-point solver
+https://github.com/isakekbom/kalmanfilter/issues/38
 
-## #10 Add baseline maximum-likelihood optimization and benchmarks
-https://github.com/isakekbom/kalmanfilter/issues/10
+Purpose: implement the iterative/full-system procedure around the local model with explicit initialization, stopping, history, and failure behavior.
 
-Depends on #8 and #9.
+**Blocked by:** #37.
 
-Benchmark at least L-BFGS/L-BFGS-B and BFGS with supplied gradients. Plain gradient descent may be retained as a diagnostic baseline because the supervisor has already observed that small gradient-descent steps can make convergence slow.
+**Blocks:** #39.
 
-Measure:
+### #39 Benchmark noisy optimization against deterministic baselines
+https://github.com/isakekbom/kalmanfilter/issues/39
 
-- objective value,
-- gradient norm,
-- wall-clock time,
-- function/gradient evaluations,
-- termination reason,
-- parameter recovery on synthetic data.
+Purpose: determine under which controlled or measured noise regimes the Section 3 method helps, does not help, or fails relative to the deterministic baseline.
 
-Report JIT compile cost separately from steady-state runtime.
+**Blocked by:** #33, #36, #38, #40.
 
-## #23 Make fixed-dimension EKF likelihood scalable to long time series
-https://github.com/isakekbom/kalmanfilter/issues/23
+**Blocks:** completion of umbrella #11.
 
-Added after #10 exposed a compilation scaling risk: its historical 24-date
-Python-loop value/gradient first call took approximately 152 seconds. Preserve
-that baseline and the general ragged drivers, and add an explicit `jax.lax.scan`
-path for fixed structural segments. Batch numerical time data outside the
-differentiated objective; reuse the existing EKF/likelihood kernels. Establish
-state, covariance, innovation, raw-gradient and optimizer parity before measuring
-first-call and warmed evaluation times through at least 1000 and preferably 5000
-dates. See [fixed scan execution and measurements](docs/fixed_scan_scaling.md).
-
-Automatic regime segmentation, padding, lifecycle inference and global parameter
-tying remain outside this issue. Complete this scalability work before #11.
-
-## #25 Benchmark curvature-aware optimizers and diagnose likelihood conditioning
-https://github.com/isakekbom/kalmanfilter/issues/25
-
-Depends on #10 and #23. Strengthen the deterministic baseline before #11 using
-exact checked JAX Hessian-vector products for Newton-CG and trust-krylov, while
-preserving BFGS, L-BFGS-B and GD. Validate second derivatives independently,
-inspect small diagnostic Hessians at generating/starting/fitted points, and
-separate derivative compilation, warmed calls and optimizer cost across time
-lengths and controlled parameter dimensions. See
-[curvature optimization and conditioning](docs/curvature_optimization.md).
-
-Local curvature findings do not establish global optimality or formal
-identifiability. Keep dense diagnostic Hessians out of the optimizer interface;
-retain strict numerical failures and existing model/parameter semantics.
-
----
-
-# Phase 4 — External parity when reference implementation arrives
-
-## #12 Add MATLAB/reference-data parity tests
-https://github.com/isakekbom/kalmanfilter/issues/12
-
-**Currently blocked.**
-
-Once supervisor MATLAB code or trusted outputs are available, compare intermediate quantities rather than only the final objective. This is the strongest test that the PDF has been interpreted correctly.
-
-If MATLAB parity reveals a mismatch, fix the core model and add regression tests before continuing experimental optimization work.
-
----
-
-# Phase 5 — Research / experimental optimization
-
-## #11 Implement and evaluate the noisy-optimization method from section 3
+### #11 Section 3 noisy-optimization umbrella
 https://github.com/isakekbom/kalmanfilter/issues/11
 
-Depends on #10, #23 scalability and #25 curvature/conditioning baselines, and should ideally also wait for #12 if the reference implementation becomes available soon.
+#11 is an umbrella, not a single implementation PR. It closes only after #33–#40 relevant to Section 3 are complete and #39 documents the final comparison.
 
-Implement equations (58)–(97) as an isolated research module. Compare it with standard optimizers using the same validated EKF objective and gradient.
+## Track C — Visualization and communication
 
-Do not let this experimental layer change the baseline EKF mathematics.
+### #28 Visualize saved optimizer benchmark results
+https://github.com/isakekbom/kalmanfilter/issues/28
+
+Purpose: parse the saved baseline/curvature result files and produce reproducible plots/tables for NLL, gradients, runtime, evaluations, convergence, scaling, and conditioning.
+
+**Ready now.** Does not block numerical implementation.
+
+### #30 Visualize model-implied discount factors and rate curves
+https://github.com/isakekbom/kalmanfilter/issues/30
+
+Purpose: visualize discount factors, fitted OIS quotes, and rate curves where a valid maturity axis exists. Synthetic/node-index plots must not be mislabeled as market curves.
+
+**Synthetic path ready now.** Real-market interpretation depends on #41/#42.
+
+## Track D — External/reference model work
+
+### #41 Resolve model and market-data conventions with the supervisor
+https://github.com/isakekbom/kalmanfilter/issues/41
+
+Purpose: resolve the remaining open questions from `docs/model_spec.md` (calendar/cash-flow conventions, loadings, state lifecycle, parameter tying, failure policy, Section 3 ambiguities, etc.) with source/supervisor evidence.
+
+**Can run in parallel with all synthetic research.** Full completion depends on external information.
+
+**Blocks:** #42 and any real-data/production claims.
+
+### #12 MATLAB/reference-data parity
+https://github.com/isakekbom/kalmanfilter/issues/12
+
+Purpose: compare EKF intermediate quantities and likelihood against trusted supervisor/reference outputs.
+
+**Externally blocked:** waiting for MATLAB/reference outputs/approved fixture.
+
+**Blocks:** #42 and claims of reference parity.
+
+### #42 Integrate trusted reference/market data into end-to-end calibration
+https://github.com/isakekbom/kalmanfilter/issues/42
+
+Purpose: build the final auditable data-adapter/calibration path from trusted inputs to fitted parameters, states, residuals, and curve outputs.
+
+**Blocked by:** #41, #12, and availability/permission for a trusted dataset.
 
 ---
 
-# Recommended execution order
-
-A practical order for Codex is:
+# Dependency graph / recommended order
 
 ```text
-#1  model specification
-#2  project skeleton
+COMPLETED CORE
+#1 + #2
    ↓
-#3  OIS observation function ─┐
-#4  structural matrices       ├→ #5 EKF → #6 likelihood
-                              │
-#7  parameter transforms ─────┘
+#3 + #4 + #7
+   ↓
+#5 → #6
+├─────────────┐
+↓             ↓
+#8            #9
+└──────┬──────┘
+       ↓
+      #10
+       ↓
+      #23
+       ↓
+      #25
+       │
+       ├──────────────┬──────────────┬──────────────┐
+       ↓              ↓              ↓              ↓
+      #33            #34            #36            #40
+                       ↓
+                      #35
+       └───────────────┼──────────────┘
+                       ↓
+                      #37
+                       ↓
+                      #38
+       #33 + #36 + #38 + #40
+                       ↓
+                      #39
+                       ↓
+                 close umbrella #11
 
-#6 + #7 → #8 gradient validation
-#3–#6   → #9 synthetic validation
+PARALLEL VISUALIZATION
+#10 + #25 → #28
+#3 + #9   → #30 synthetic visualization
 
-#8 + #9 → #10 baseline optimization
-
-#5 + #6 → #12 MATLAB parity   [blocked until reference available]
-
-#10 → #23 fixed-shape scan scalability → #25 curvature/conditioning → #11 noisy optimization experiment
+EXTERNAL / REAL-DATA TRACK
+#41 ─────────────┐
+                 ├→ #42 real/reference calibration
+#12 [external] ──┘
+#42 → real-data extension of #30
 ```
 
-# Definition of "baseline model complete"
+## What contributors can start immediately
 
-The baseline implementation should not be considered complete until all of the following hold:
+Because #25 is completed, independent contributors can work in parallel on:
 
-- equations (8)–(57) have a clear implementation mapping;
-- matrix/vector dimensions are documented;
+- #28 benchmark visualization;
+- #30 synthetic curve/quote visualization;
+- #33 numerical precision-floor measurements;
+- #34 Section 3 mathematical specification;
+- #36 controlled noisy-objective harness;
+- #40 deterministic scaling/preconditioning diagnostics;
+- #41 supervisor/model-convention resolution.
+
+Do **not** start #35 before #34, #37 before #33/#34/#35/#36, #38 before #37, or #39 before #33/#36/#38/#40.
+
+---
+
+# Definition of deterministic baseline complete
+
+The deterministic baseline is considered complete when:
+
+- equations (8)–(57) have a documented implementation mapping;
 - JAX runs in float64;
-- the filter uses stable solves rather than explicit inverses;
-- covariance and innovation matrices remain numerically well behaved on tests;
+- stable solves/Cholesky are used instead of explicit inverses;
 - synthetic end-to-end tests pass;
-- the full likelihood gradient passes independent numerical checks;
-- intermediate values are inspectable for later MATLAB parity.
+- full likelihood gradients pass independent checks;
+- fixed-shape long-series execution is scalable;
+- deterministic optimizers/curvature diagnostics are benchmarked;
+- intermediate EKF quantities remain inspectable for later parity.
 
-# Known limitations at repository start
+Issues #1–#10, #23, and #25 satisfy this baseline. Future research must preserve it as a regression reference.
 
-At the time this roadmap was created, the repository contains only `kalmanRante.pdf`. In particular we do **not** yet have:
+# Known external limitations
 
-- the supervisor's MATLAB implementation;
-- real market input data;
-- trusted reference parameter values;
-- trusted expected states or likelihood values;
-- a complete operational specification for every time-varying matrix in the PDF.
+Until #12/#41/#42 are resolved, the project must not claim:
 
-Codex should treat these as genuine unknowns, not invitations to fabricate missing information. Any temporary convention required for synthetic tests must be documented and isolated so it can be replaced when the reference implementation/data becomes available.
+- MATLAB/reference implementation parity;
+- correctness of unresolved market calendar/cash-flow conventions;
+- validated real-market parameter estimates;
+- production-grade state lifecycle/parameter tying beyond documented conventions;
+- real-data superiority of any optimizer.
+
+Synthetic experiments remain valuable for numerical and algorithmic research, but they do not replace external/reference validation.
