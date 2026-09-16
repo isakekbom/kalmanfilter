@@ -10,6 +10,10 @@ optimization utilities.
 Read the relevant document in `docs/` before changing mathematical behavior.
 The documentation describes the model contracts and equation-level conventions.
 
+For user-facing setup and examples, see [`README.md`](README.md). For the human
+contributor workflow and pull request checklist, see
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ## Repository structure
 
 ```text
