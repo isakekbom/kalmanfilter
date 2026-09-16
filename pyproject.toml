@@ -18,4 +18,6 @@ packages = ["src/kalmanfilter"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Benchmark scripts are standalone; tests import their shared configuration module by name.
+pythonpath = ["benchmarks"]
 addopts = ["--import-mode=importlib", "--strict-config", "--strict-markers"]

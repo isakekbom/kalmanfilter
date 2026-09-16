@@ -2,12 +2,12 @@
 
 Run: uv run --locked python benchmarks/curvature_optimization.py
 JSON records on stdout retain failures, native solver messages and full precision.
-Use --case to reproduce a subset; default all runs the documented protocol.
+Use --case to reproduce a preset; default all runs the documented protocol.
+Configuration flags (docs/benchmark_config.md) vary one selected --case.
 """
 
 import argparse
-from dataclasses import asdict
-import json
+from dataclasses import asdict, replace
 from pathlib import Path
 import platform
 from time import perf_counter
@@ -20,15 +20,16 @@ from jax.experimental import checkify
 import numpy as np
 import scipy
 
-from kalmanfilter.fixed_scan import FixedScanInputs, stack_fixed_inputs, run_fixed_scan_likelihood
-from kalmanfilter.ois import OISInstrument
+from benchmark_config import (
+    METHODS, PRESETS, PROTOCOL_FIELDS, BenchmarkConfig, BenchmarkProblem, add_config_arguments,
+    argument_overrides, build_problem, config_from_arguments, make_scan_objective, prefix_problem,
+    problem_record, serialize,
+)
+from kalmanfilter.fixed_scan import FixedScanInputs, stack_fixed_inputs
 from kalmanfilter.optimization import CompiledObjective, run_optimization
-from kalmanfilter.params import ModelParameters, ParameterLayout, pack_parameters, unpack_parameters
-from kalmanfilter.synthetic import SyntheticStepInputs, generate_synthetic_dataset
-from kalmanfilter.transition import DiagonalMatrix, StateCoordinates, StructuralStep, selection_map
+from kalmanfilter.params import ModelParameters, ParameterLayout, unpack_parameters
 
 
-METHODS = ("BFGS", "L-BFGS-B", "GD", "Newton-CG", "trust-krylov")
 H_STEPS = (1e-3, 1e-4, 1e-5, 1e-6)
 
 
@@ -41,41 +42,27 @@ class Problem(NamedTuple):
     batch: FixedScanInputs
     objective: object
     starts: tuple[jax.Array, ...]
+    source: BenchmarkProblem
+    preset: str | None
+
+    @property
+    def config(self) -> BenchmarkConfig:
+        return self.source.config
 
 
 def emit(kind, **values):
-    def convert(value):
-        if isinstance(value, (jax.Array, np.ndarray, np.generic)):
-            return np.asarray(value).tolist()
-        raise TypeError(type(value).__name__)
-    print(kind + " " + json.dumps(values, default=convert, allow_nan=False, sort_keys=True), flush=True)
+    print(kind + " " + serialize(values), flush=True)
 
 
-def make_objective(initial, batch, layout):
-    """Explicit benchmark-only time sharing: phi, measurement variance, loading.
-
-    Fixed process covariance and initial distribution anchor the latent scale.
-    All raw blocks use existing transforms; no global extraction rule is added.
-    """
-    def objective(raw):
-        p = unpack_parameters(raw, layout)
-        numerical = batch._replace(
-            theta_f=jnp.broadcast_to(p.theta_f, batch.theta_f.shape),
-            sigma_v=DiagonalMatrix(jnp.broadcast_to(p.sigma_v.diagonal, batch.sigma_v.diagonal.shape)),
-            theta_g=jnp.broadcast_to(p.theta_g, batch.theta_g.shape),
-        )
-        return -run_fixed_scan_likelihood(initial, numerical).total_log_likelihood
-    return objective
+make_objective = make_scan_objective
 
 
-def reference_case(reference, batch, n_dates):
-    prefix = FixedScanInputs(batch.step, *jax.tree.map(lambda a: a[:n_dates], batch[1:]))
-    initial, layout = reference.dataset.initial_filter, reference.layout
-    # T=24 retains all three original starts; long cases use the first two,
-    # except T=5000 where every method receives just the identical first start.
-    starts = reference.starts if n_dates == 24 else reference.starts[:1 if n_dates == 5000 else 2]
-    return Problem(f"reference_T{n_dates}", layout, reference.true_parameters, reference.true_raw,
-                   initial, prefix, make_objective(initial, prefix, layout), starts)
+def curvature_problem(problem: BenchmarkProblem, name: str, preset: str | None = None) -> Problem:
+    """Stack the generated dates once; the scan objective shares phi/sigma_v/theta_g."""
+    batch = stack_fixed_inputs(problem.dataset.inputs)
+    initial = problem.dataset.initial_filter
+    return Problem(name, problem.layout, problem.true_parameters, problem.true_raw, initial, batch,
+                   make_objective(initial, batch, problem.layout), problem.starts, problem, preset)
 
 
 def make_larger_problem(n_states, n_dates=100, seed=202625):
@@ -85,39 +72,8 @@ def make_larger_problem(n_states, n_dates=100, seed=202625):
     different explicit weights. Each loading column shares one theta_g across
     quotes/dates. These are synthetic inputs, not financial/model conventions.
     """
-    if n_states < 2 or n_dates < 1:
-        raise ValueError("larger family requires at least two states and one date")
-    names = tuple(f"p{i}" for i in range(n_states))
-    coordinates = StateCoordinates(names, (), ())
-    quotes = tuple(f"q{i}{kind}" for i in range(n_states) for kind in ("a", "b"))
-    identity = selection_map(names, names, names)
-    step = StructuralStep(coordinates, coordinates, identity, identity, identity,
-                          selection_map(quotes, (), (None,) * len(quotes)),
-                          selection_map(quotes, quotes, quotes))
-    instruments = []
-    for i in range(n_states):
-        for kind in range(2):
-            weights = jnp.eye(n_states)[i] + (0.15 if kind == 0 else 0.3) * jnp.eye(n_states)[(i + 1) % n_states]
-            loadings = jnp.stack((jnp.zeros((n_states, n_states)), -jnp.diag(weights)))
-            if kind == 1:
-                loadings = loadings.at[0].set(0.2 * jnp.diag(weights)).at[1].set(-1.5 * jnp.diag(weights))
-            instruments.append(OISInstrument(jnp.array([1.0 if kind == 0 else 0.5]),
-                                             loadings, jnp.empty((2, 0))))
-    layout = ParameterLayout(n_f=n_states, n_w=0, n_v=2 * n_states, n_x0=0, n_g=n_states,
-                             theta_f_transform="unit_interval")
-    truth = ModelParameters(jnp.linspace(0.8, 0.94, n_states), DiagonalMatrix(jnp.empty(0)),
-                           DiagonalMatrix(jnp.linspace(0.0004, 0.001, 2 * n_states)),
-                           jnp.empty(0), jnp.empty((0, 0)), jnp.linspace(0.65, 0.9, n_states))
-    raw = pack_parameters(truth, layout)
-    date = SyntheticStepInputs(step, truth.theta_f, DiagonalMatrix(jnp.linspace(0.0015, 0.003, n_states)),
-                               truth.theta_g, truth.sigma_v, tuple(instruments))
-    data = generate_synthetic_dataset(jax.random.key(seed), coordinates,
-        jnp.linspace(0.2, 0.35, n_states), jnp.eye(n_states) * 0.0025, (date,) * n_dates)
-    batch = stack_fixed_inputs(data.inputs)
-    first = jnp.concatenate((jnp.full(n_states, 0.2), jnp.linspace(-0.2, 0.2, 2 * n_states), jnp.full(n_states, 0.05)))
-    second = jnp.concatenate((jnp.full(n_states, -0.3), jnp.linspace(0.3, -0.3, 2 * n_states), jnp.full(n_states, -0.08)))
-    return Problem(f"larger_n{n_states}", layout, truth, raw, data.initial_filter, batch,
-                   make_objective(data.initial_filter, batch, layout), (raw + first, raw + second))
+    config = BenchmarkConfig(family="larger", n_states=n_states, n_dates=n_dates, seed=seed)
+    return curvature_problem(build_problem(config), f"larger_n{n_states}")
 
 
 def dense_hessian_function(objective):
@@ -217,6 +173,11 @@ def parameters_record(parameters):
                 sigma_0=parameters.sigma_0, theta_g=parameters.theta_g)
 
 
+def is_regression_anchor(problem):
+    """The exact #10 problem with all three first-order methods present."""
+    return problem.preset == "reference" and set(METHODS[:3]) <= set(problem.config.methods)
+
+
 def regression_anchor(runs):
     """Compare against saved #10 results, including their printed precision."""
     lines = (Path(__file__).parent / "results/baseline_optimization.txt").read_text(encoding="utf-8").splitlines()
@@ -248,14 +209,14 @@ def regression_anchor(runs):
          source="historical rounded #10 stdout; same problem/starts, current scan execution")
 
 
-def benchmark(problem, repeats):
+def benchmark(problem):
+    config, repeats, methods = problem.config, problem.config.repeats, problem.config.methods
+    if repeats is None or methods is None:
+        raise ValueError("benchmark needs a config with resolved protocol fields (repeats, methods)")
     p, t = problem.layout.n_parameters, problem.batch.n_steps
-    emit("PROBLEM", name=problem.name, T=t, p=p, n_x=len(problem.initial.state),
-         n_z=problem.batch.observations.shape[1], starts=problem.starts, generating_raw=problem.true_raw,
-         generating_parameters=parameters_record(problem.true_parameters),
-         fixed_initial_mean=problem.initial.state, fixed_initial_covariance=problem.initial.covariance,
-         fixed_process_variance=problem.batch.sigma_w.diagonal[0],
-         raw_order="theta_f; sigma_v; theta_g", theta_f_transform=problem.layout.theta_f_transform)
+    assert (t, p, len(problem.initial.state), problem.batch.observations.shape[1]) == (
+        config.n_dates, config.p, config.n_x, config.n_z)
+    emit("PROBLEM", name=problem.name, **problem_record(problem.source))
     compiled = CompiledObjective(problem.objective, problem.true_raw)
     direction = jnp.ones(p) / jnp.sqrt(float(p))
     compiled.hessian_vector_product(problem.true_raw, direction)
@@ -272,11 +233,11 @@ def benchmark(problem, repeats):
     # Keep #10's exact fixed rate at T=24. For other T use its average-per-date
     # scale, declared for GD only; every method still evaluates the full NLL.
     rate = 1e-4 * 24 / t
-    emit("PROTOCOL", problem=problem.name, methods=METHODS, max_iterations=200,
+    emit("PROTOCOL", problem=problem.name, methods=methods, max_iterations=200,
          gradient_tolerance=1e-6, function_tolerance=1e-12, step_tolerance=1e-8,
          GD_learning_rate=rate, starts=len(problem.starts), retries=0)
     runs = {}
-    for method in METHODS:
+    for method in methods:
         for index, start in enumerate(problem.starts):
             evaluations, hvps = compiled.total_evaluations, compiled.total_hvp_evaluations
             begun = perf_counter()
@@ -302,43 +263,53 @@ def benchmark(problem, repeats):
     else:
         emit("DIAGNOSTIC_UNAVAILABLE", problem=problem.name, point="converged_BFGS",
              reason="No BFGS run reported success; no converged point is fabricated.")
-    if problem.name == "reference_T24":
+    if is_regression_anchor(problem):
         regression_anchor(runs)
-    emit("CASE_COMPLETE", problem=problem.name, completed_runs=len(runs), expected_runs=len(METHODS) * len(problem.starts),
+    emit("CASE_COMPLETE", problem=problem.name, completed_runs=len(runs), expected_runs=len(methods) * len(problem.starts),
          total_value_gradient_dispatches=compiled.total_evaluations,
          total_hvp_dispatches=compiled.total_hvp_evaluations)
 
 
-def main():
-    from baseline_optimization import make_problem
+def case_name(config, preset):
+    return preset if preset is not None else f"custom_{config.family}_n{config.n_x}_T{config.n_dates}"
 
+
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    choices = ("all", "reference", "long100", "long1000", "long5000", "larger3", "larger6")
-    parser.add_argument("--case", choices=choices, default="all")
-    parser.add_argument("--repeats", type=int, default=5)
+    parser.add_argument("--case", choices=("all", *PRESETS), default="all",
+                        help="documented preset to run; 'all' runs every preset")
+    add_config_arguments(parser, preset=False)
     args = parser.parse_args()
-    if args.repeats < 1:
-        parser.error("--repeats must be positive")
+    generation_overrides = set(argument_overrides(args)) - set(PROTOCOL_FIELDS)
+    if args.case == "all" and (generation_overrides or args.config is not None):
+        parser.error("--case all runs the documented presets; generation flags and --config need one --case")
+    cases = tuple(PRESETS) if args.case == "all" else (args.case,)
+    configs = {name: config_from_arguments(args, PRESETS[name]).defaulted(repeats=5, methods=METHODS)
+               for name in cases}
+    presets = {name: name if configs[name].generation() == PRESETS[name].generation() else None for name in cases}
     emit("ENV", platform=platform.platform(), python=platform.python_version(), jax=jax.__version__,
          numpy=np.__version__, scipy=scipy.__version__, device=str(jax.devices()[0]), float64=jax.config.x64_enabled,
-         reference_seed=20261010, larger_seed=202625, case=args.case,
+         case=args.case, configs={name: config.resolve().to_dict() for name, config in configs.items()},
          timing="perf_counter; synchronized checked calls; setup and dense diagnostics excluded from optimizer timings")
     a = jnp.array([[4.0, 0.6, -0.2], [0.6, 2.0, 0.3], [-0.2, 0.3, 1.2]])
     b = jnp.array([1.0, -2.0, 0.5])
     quadratic = lambda x: 0.5 * x @ a @ x + b @ x + 2.0
     points = (jnp.array([0.2, -0.4, 0.7]), jnp.array([-0.8, 1.1, -0.5]))
     validate_hvp("analytical_SPD_quadratic", quadratic, CompiledObjective(quadratic, points[0]), points)
-    lengths = {"reference": 24, "long100": 100, "long1000": 1000, "long5000": 5000}
-    selected = tuple(lengths) if args.case == "all" else ((args.case,) if args.case in lengths else ())
-    if selected:
-        emit("SETUP", message="Generate genuine dates once; shorter reference cases use prefixes.")
-        reference = make_problem(max(lengths[key] for key in selected))
-        batch = stack_fixed_inputs(reference.dataset.inputs)
-        for key in selected:
-            benchmark(reference_case(reference, batch, lengths[key]), args.repeats)
-    for size in (3, 6):
-        if args.case in ("all", f"larger{size}"):
-            benchmark(make_larger_problem(size), args.repeats)
+    # The documented reference presets share one generation: generate the
+    # longest once and take exact prefixes. Every other case is built directly.
+    shared = [name for name in cases if presets[name] is not None and configs[name].family == "reference"]
+    generated = None
+    if len(shared) > 1:
+        emit("SETUP", message="Generate genuine reference dates once; shorter reference cases use prefixes.")
+        longest = configs[max(shared, key=lambda name: configs[name].n_dates)]
+        generated = build_problem(replace(longest, n_starts=None, start_offsets=None))
+    for name in cases:
+        if generated is not None and name in shared:
+            problem = prefix_problem(generated, configs[name])
+        else:
+            problem = build_problem(configs[name])
+        benchmark(curvature_problem(problem, case_name(problem.config, presets[name]), presets[name]))
     emit("COMPLETE", case=args.case, remat=False, noisy_optimization=False)
 
 

@@ -211,7 +211,11 @@ pytest commands above. The full suite includes the unchanged 436-test baseline.
 benchmark timing measurements below.
 
 The benchmark uses seed 20261010 and generates 5000 genuine dates with the
-existing synthetic generator once. Shorter runs use prefixes. Generation and
+existing synthetic generator once. Shorter runs use prefixes. These defaults
+are the `reference` preset of [benchmark_config.md](benchmark_config.md) at
+`--dates 5000`; the family, series length, noise scales, seed, starts and
+timing repeats can be varied with the flags documented there, while the BFGS
+parity protocol itself is fixed (`--methods` is refused). Generation and
 stacking are setup work and excluded from timings. The sole newly compiled
 Python-loop value/gradient reference uses T=12; no long Python-loop gradient is
 compiled. Plain scan is measured at T=12,24,100,500,1000,5000.

@@ -170,17 +170,23 @@ git diff --check
 The benchmark emits tagged JSON lines retaining full precision, fitted raw and
 mathematical parameters, derivative errors, timings, native statuses/messages
 and failures. `--case reference`, `long100`, `long1000`, `long5000`, `larger3` or
-`larger6` reproduces a subset. Full output is saved under
-`benchmarks/results/curvature_optimization.txt`.
+`larger6` reproduces one named preset from
+[benchmark_config.md](benchmark_config.md); the configuration flags documented
+there (`--states`, `--dates`, `--observation-variance-scale`, ...) vary that
+preset, and every `PROBLEM` record carries the resolved configuration. Full
+output of the documented protocol is saved under
+`benchmarks/results/curvature_optimization.txt`; it predates the configuration
+layer and names the cases `reference_T24`, `reference_T100`, `reference_T1000`,
+`reference_T5000`, `larger_n3` and `larger_n6`.
 
-| Case | T | p | n_x | n_z | Starts per method |
+| Preset (`--case`) | T | p | n_x | n_z | Starts per method |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Exact #10 reference | 24 | 4 | 1 | 2 | 3 original starts |
-| Long reference family | 100 | 4 | 1 | 2 | 2 original starts |
-| Long reference family | 1000 | 4 | 1 | 2 | 2 original starts |
-| Long reference family | 5000 | 4 | 1 | 2 | 1 original start |
-| Larger family | 100 | 12 | 3 | 6 | 2 explicit starts |
-| Larger family | 100 | 24 | 6 | 12 | 2 explicit starts |
+| `reference` (exact #10 reference) | 24 | 4 | 1 | 2 | 3 original starts |
+| `long100` (long reference family) | 100 | 4 | 1 | 2 | 2 original starts |
+| `long1000` (long reference family) | 1000 | 4 | 1 | 2 | 2 original starts |
+| `long5000` (long reference family) | 5000 | 4 | 1 | 2 | 1 original start |
+| `larger3` (larger family) | 100 | 12 | 3 | 6 | 2 explicit starts |
+| `larger6` (larger family) | 100 | 24 | 6 | 12 | 2 explicit starts |
 
 All five methods run for each listed start. The T=5000 subset limits total study
 cost while retaining all methods; it provides less evidence about start
@@ -191,9 +197,9 @@ but uses the already validated scan execution. Comparisons to #10 use its saved
 rounded NLL/parameter values with explicit tolerances, not its historical timing
 as a current-machine comparator.
 
-The larger family uses seed 202625, n independent PCA transitions, 2n nonlinear
-quotes and 4n free raw parameters: n persistence values, 2n measurement
-variances, n loading coefficients. A quote loads on its own factor and a cyclic
+The larger family (`family="larger"` in `BenchmarkConfig`) uses seed 202625,
+n independent PCA transitions, 2n nonlinear quotes and 4n free raw parameters:
+n persistence values, 2n measurement variances, n loading coefficients. A quote loads on its own factor and a cyclic
 neighbor with weights 0.15 (quote a) or 0.3 (quote b). Loading maps are diagonal
 in the n `theta_g` coefficients; start/payment multipliers and accruals follow
 the #10 two-quote construction. These explicit loadings couple parameter
