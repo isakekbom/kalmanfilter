@@ -1,5 +1,9 @@
 # Baseline maximum-likelihood optimization
 
+This document records the original #10 scope and measurements. The existing
+methods remain available; [#25](curvature_optimization.md) adds HVP-based methods
+and a separate conditioning study without changing these historical results.
+
 [Issue #10](https://github.com/isakekbom/kalmanfilter/issues/10) adds baseline
 optimization after the [full-gradient checks](gradient_validation.md) and
 [synthetic validation](synthetic.md). The host orchestration lives in

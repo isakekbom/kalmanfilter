@@ -324,9 +324,9 @@ def test_selected_mathematical_parameters_recover_from_moderate_start(synthetic_
         # toward truth when the measured finite-sample optimum lies elsewhere.
 
 
-def test_optimizer_source_excludes_second_order_research_and_hidden_starts():
+def test_optimizer_source_excludes_dense_hessians_research_and_hidden_starts():
     tree = ast.parse(Path(optimization.__file__).read_text(encoding="utf-8"))
-    forbidden = {"hessian", "jacfwd", "jacrev", "hess", "hessp", "eigh", "eigvalsh", "inv", "pinv",
+    forbidden = {"hessian", "jacfwd", "jacrev", "hess", "eigh", "eigvalsh", "inv", "pinv",
                  "random", "clip", "nan_to_num", "central_difference_gradient", "stop_gradient"}
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):

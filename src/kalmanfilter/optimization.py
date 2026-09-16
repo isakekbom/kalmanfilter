@@ -1,9 +1,10 @@
-"""Baseline host orchestration for checked float64 JAX objectives (issue #10).
+"""Host orchestration for checked float64 JAX objectives (issues #10 and #25).
 
 Compile once, then reuse across explicit starts and methods. NumPy conversions
 are confined to this host/SciPy boundary; the mathematical objective stays in
 JAX. Checked failures propagate as exceptions and never become finite penalties.
 See docs/baseline_optimization.md for timing and evaluation-count conventions.
+Exact HVPs and curvature methods are documented in docs/curvature_optimization.md.
 """
 
 from collections.abc import Callable, Sequence
@@ -19,7 +20,8 @@ from jax.experimental import checkify
 from jax.typing import ArrayLike
 from scipy.optimize import minimize
 
-Method = Literal["BFGS", "L-BFGS-B", "GD"]
+Method = Literal["BFGS", "L-BFGS-B", "GD", "Newton-CG", "trust-krylov"]
+_CURVATURE_METHODS = ("Newton-CG", "trust-krylov")
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +54,9 @@ class OptimizationResult:
     message: str
     optimization_seconds: float
     compilation_seconds: float
+    hvp_evaluations: int = 0
+    solver_hessian_evaluations: int | None = None
+    hvp_compilation_seconds: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +65,7 @@ class MultistartResult:
 
     runs: tuple[OptimizationResult, ...]
     compilation_seconds: float
+    hvp_compilation_seconds: float = 0.0
 
     @property
     def best_index(self) -> int:
@@ -93,6 +99,8 @@ class CompiledObjective:
     including tracing/compilation and dispatch; it is not pure compiler time.
     evaluate() counts actual subsequent calls, including failures. This mutable
     host handle is intended for serial reuse; result records are immutable.
+    HVP compilation is lazy and separately timed/counted. First-order methods
+    do not trace or execute the second derivative.
     """
 
     def __init__(self, objective: Callable[[Array], ArrayLike], example_raw: ArrayLike):
@@ -115,6 +123,19 @@ class CompiledObjective:
             checkify.check(jnp.all(jnp.isfinite(gradient)), "optimizer gradient must be finite")
             return value, gradient
 
+        def checked_gradient(point):
+            return value_and_gradient(point)[1]
+
+        def hessian_product(point, vector):
+            # Forward-over-reverse AD; no dense Hessian or finite differences.
+            _, product = jax.jvp(checked_gradient, (point,), (vector,))
+            checkify.check(jnp.all(jnp.isfinite(product)), "optimizer HVP must be finite")
+            return product
+
+        self._hvp_function = hessian_product
+        self._compiled_hvp = None
+        self.total_hvp_evaluations = 0
+        self.hvp_compilation_seconds = 0.0
         self._compiled = jax.jit(checkify.checkify(value_and_gradient))
         self.total_evaluations = 0
         started = perf_counter()
@@ -130,6 +151,32 @@ class CompiledObjective:
         jax.block_until_ready((error, value, gradient))
         error.throw()
         return float(value), np.asarray(gradient, dtype=np.float64).copy()
+
+    def hessian_vector_product(self, raw_vector: ArrayLike, vector: ArrayLike) -> np.ndarray:
+        """Evaluate exact H(raw) @ vector, checking value, gradient and product.
+
+        The finite real direction must have the compiled raw shape; it is not
+        normalized or clipped. Count every dispatch (also numerical failures),
+        separately from evaluate(), even though AD computes a primal gradient.
+        Shape/type failures before dispatch do not increment either counter.
+        The first synchronized call includes compilation and records its cost.
+        """
+        raw = _raw_vector(raw_vector, self.shape)
+        direction = _raw_vector(vector, self.shape)
+        point, tangent = jnp.asarray(raw), jnp.asarray(direction)
+        first_call = self._compiled_hvp is None
+        if first_call:
+            started = perf_counter()
+            self._compiled_hvp = jax.jit(checkify.checkify(self._hvp_function))
+        self.total_hvp_evaluations += 1
+        error, product = self._compiled_hvp(point, tangent)
+        jax.block_until_ready((error, product))
+        try:
+            error.throw()
+            return np.asarray(product, dtype=np.float64).copy()
+        finally:
+            if first_call:
+                self.hvp_compilation_seconds = perf_counter() - started
 
 
 def _positive_option(value: float, name: str) -> float:
@@ -147,6 +194,7 @@ def run_optimization(
     gradient_tolerance: float = 1e-6,
     function_tolerance: float = 1e-12,
     learning_rate: float = 0.01,
+    step_tolerance: float = 1e-8,
 ) -> OptimizationResult:
     """Optimize unconstrained raw coordinates with supplied JAX gradients.
 
@@ -154,23 +202,34 @@ def run_optimization(
     criterion and relative objective tolerance. Reported norms are always 2-norms.
     GD uses a fixed learning rate and 2-norm stopping only. max_iterations=0
     returns the evaluated initial point. Failures raise without repair/retry.
+    Newton-CG uses step_tolerance as native xtol, not a gradient criterion;
+    trust-krylov uses gtol on the 2-norm. Native status/messages are preserved.
 
     A run-local last-point cache serves solver requests, callbacks, and final
     reporting. Cache misses invoke and count the combined compiled function.
     First-call time belongs to objective.compilation_seconds and is excluded
     from every run's optimization_seconds. Each run includes its initial call.
+    Curvature methods warm a not-yet-compiled HVP before the run timer/counters,
+    using the initial point and an all-ones direction. Its first-call cost is
+    separately referenced by hvp_compilation_seconds; warmup is a global HVP
+    dispatch, not a run evaluation. No HVP is needed when max_iterations=0.
     """
     if not isinstance(objective, CompiledObjective):
         raise TypeError("objective must be a CompiledObjective")
-    if method not in ("BFGS", "L-BFGS-B", "GD"):
-        raise ValueError("method must be BFGS, L-BFGS-B, or GD")
+    if method not in ("BFGS", "L-BFGS-B", "GD", *_CURVATURE_METHODS):
+        raise ValueError("method must be BFGS, L-BFGS-B, GD, Newton-CG, or trust-krylov")
     if isinstance(max_iterations, bool) or not isinstance(max_iterations, int) or max_iterations < 0:
         raise ValueError("max_iterations must be a nonnegative integer")
     gtol = _positive_option(gradient_tolerance, "gradient_tolerance")
     ftol = _positive_option(function_tolerance, "function_tolerance")
     rate = _positive_option(learning_rate, "learning_rate")
+    xtol = _positive_option(step_tolerance, "step_tolerance")
     initial = _raw_vector(initial_raw, objective.shape)
+    uses_hvp = method in _CURVATURE_METHODS and max_iterations > 0
+    if uses_hvp and objective._compiled_hvp is None:
+        objective.hessian_vector_product(initial, np.ones_like(initial))
     evaluations_before = objective.total_evaluations
+    hvps_before = objective.total_hvp_evaluations
     cached_raw, cached_value, cached_gradient = None, None, None
     history = []
     started = perf_counter()
@@ -194,6 +253,7 @@ def run_optimization(
 
     record(initial)
     solver_nfev = solver_njev = None
+    solver_nhev = None
     final = initial.copy()
     if method == "GD" or max_iterations == 0:
         success = history[-1].gradient_norm <= gtol
@@ -212,14 +272,22 @@ def run_optimization(
         options = {"maxiter": max_iterations, "gtol": gtol}
         if method == "BFGS":
             options.update(norm=2, xrtol=0, c1=1e-4, c2=0.9)
-        else:
+        elif method == "L-BFGS-B":
             options.update(ftol=ftol, maxcor=10, maxls=40, maxfun=20000)
+        elif method == "Newton-CG":
+            options = {"maxiter": max_iterations, "xtol": xtol, "c1": 1e-4, "c2": 0.9}
+        else:
+            options.update(initial_trust_radius=1.0, max_trust_radius=1000.0,
+                           eta=0.15, inexact=True)
+        curvature = {"hessp": objective.hessian_vector_product} if uses_hvp else {}
         solved = minimize(evaluate, initial, method=method, jac=True, bounds=None,
-                          callback=record, options=options)
+                          callback=record, options=options, **curvature)
         final = solved.x
         iterations, success, status = int(solved.nit), bool(solved.success), int(solved.status)
         message = str(solved.message)
         solver_nfev, solver_njev = int(solved.nfev), int(solved.njev)
+        if uses_hvp and getattr(solved, "nhev", None) is not None:
+            solver_nhev = int(solved.nhev)
 
     value, gradient = evaluate(final)
     elapsed = perf_counter() - started  # Every compiled call above synchronized.
@@ -229,6 +297,8 @@ def run_optimization(
         jnp.asarray(gradient), float(np.linalg.norm(gradient)), tuple(history), iterations,
         evaluations, evaluations, solver_nfev, solver_njev, success, status, message,
         elapsed, objective.compilation_seconds,
+        objective.total_hvp_evaluations - hvps_before, solver_nhev,
+        objective.hvp_compilation_seconds if uses_hvp else 0.0,
     )
 
 
@@ -245,4 +315,5 @@ def run_multistart(
     if not starts:
         raise ValueError("multistart requires at least one starting vector")
     runs = tuple(run_optimization(objective, start, **options) for start in starts)
-    return MultistartResult(runs, objective.compilation_seconds)
+    return MultistartResult(runs, objective.compilation_seconds,
+                           max(run.hvp_compilation_seconds for run in runs))
