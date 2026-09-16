@@ -218,7 +218,153 @@ process measurements, not isolated compiler-only or peak-memory measurements.
 
 ## Measured results
 
-Measurements are added from the reproducible benchmark output after validation.
+The complete deterministic benchmark finished all requested cases and runs with
+`noisy_optimization=false`. Results below are from the documented Windows/CPU,
+float64 environment and should be interpreted as measurements of this benchmark,
+not as market-calibration claims.
+
+### Derivative correctness and #10 regression
+
+The HVP implementation agreed with independently formed dense JAX
+Hessian-vector products across all benchmark families. Maximum absolute
+dense-HVP discrepancies were on the order of `1e-13` to `1.8e-12`; the
+directional finite-difference check at `h=1e-5` also passed the documented
+tolerances in every case. This supports using the HVP path as an exact-AD
+second-order interface rather than as a finite-difference approximation.
+
+The exact `T=24`, `p=4` reference problem preserved the historical #10
+first-order result. Across the nine BFGS/L-BFGS-B/GD regression runs, the
+maximum absolute NLL difference from the saved #10 output was
+`4.78e-10`, and the maximum absolute fitted-parameter difference was
+`4.73e-9`. The scan/HVP work therefore did not materially change the previous
+baseline result.
+
+### Derivative cost and time-series scaling
+
+Warm checked value+gradient and HVP costs increased with the number of dates,
+while first-call JIT costs remained separate from optimizer timing.
+
+| Problem | T | p | Warm value+gradient | Warm HVP |
+| --- | ---: | ---: | ---: | ---: |
+| reference | 24 | 4 | 1.56 ms | 1.98 ms |
+| reference | 100 | 4 | 2.80 ms | 6.02 ms |
+| reference | 1000 | 4 | 24.3 ms | 54.5 ms |
+| reference | 5000 | 4 | 122 ms | 266 ms |
+| larger_n3 | 100 | 12 | 10.1 ms | 20.9 ms |
+| larger_n6 | 100 | 24 | 15.2 ms | 36.5 ms |
+
+The fixed-shape scan therefore keeps a 5000-date value+gradient evaluation
+practical on CPU. An HVP costs roughly two to somewhat more than two
+value+gradient evaluations in these cases, so curvature-aware methods must
+recover that extra per-call cost through better optimization progress.
+
+### Reference-family optimizer behavior
+
+On the `T=24` anchor, BFGS, L-BFGS-B, Newton-CG and trust-krylov reached the
+same local optimum to numerical precision from the documented starts. The
+curvature methods often ended with smaller gradient norms, but required HVP
+work. Plain fixed-step GD remained a diagnostic baseline rather than a
+competitive solver.
+
+The longest reference case (`T=5000`, `p=4`) makes the trade-off clearest:
+
+| Method | Final NLL | Final gradient 2-norm | Iterations | Value+gradient calls | HVP calls | Warm optimization time | Native status |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| BFGS | -14572.801234 | 6.81e-8 | 12 | 18 | 0 | 2.15 s | success |
+| L-BFGS-B | -14572.801234 | 1.54e-5 | 15 | 19 | 0 | 2.43 s | success by relative objective reduction |
+| GD | -14544.566779 | 4.33e2 | 200 | 201 | 0 | 25.49 s | iteration limit |
+| Newton-CG | -14572.801234 | 6.60e-10 | 11 | 13 | 29 | 9.15 s | success |
+| trust-krylov | -14572.801234 | 2.97e-6 | 10 | 14 | 39 | 11.99 s | native status 2 |
+
+BFGS, L-BFGS-B, Newton-CG and trust-krylov therefore agreed on the attained
+objective, but their stopping diagnostics differed materially. In particular,
+L-BFGS-B reported native success although its common gradient 2-norm remained
+above `1e-6`, while trust-krylov reported a native failure message despite
+reaching the same NLL with a small gradient. This is why native solver status,
+objective value and a common gradient diagnostic are all retained.
+
+GD was still far from the common solution after 200 iterations and took longer
+than the other methods in this case. The result supports the original use of GD
+as a conditioning diagnostic, not as the main estimator.
+
+### Local curvature in the reference family
+
+The local Hessian diagnostics show that poor or strongly varying curvature is a
+plausible explanation for slow fixed-step GD. At `T=24`, the generating-point
+SPD condition number was about `406`. Representative starts ranged from about
+`165` to `9756`, and one start was locally indefinite with one materially
+negative eigenvalue. At the converged BFGS solution the SPD condition number
+was about `6005`; its smallest-curvature eigenvector was almost entirely in the
+measurement-variance (`sigma_v`) block.
+
+For the converged BFGS solutions at longer reference prefixes, the reported SPD
+condition numbers were approximately `1250` at `T=100`, `109` at `T=1000`, and
+`131` at `T=5000`. Thus increasing `T` did not make local conditioning
+monotonically worse in this seeded synthetic family. These are local,
+sample-specific Hessian measurements and should not be interpreted as a general
+law that longer samples improve conditioning.
+
+### Larger parameter problems
+
+The `p=12` and `p=24` cases exposed behavior that is not visible in the
+four-parameter reference problem.
+
+For `larger_n3` (`T=100`, `p=12`), both BFGS runs reported success with final
+gradient norms below `1e-6` and NLL near `-895.95307929`. L-BFGS-B reached
+essentially the same objective and reported native success by relative objective
+reduction, but its final gradient norms were about `1.5e-4` and `2.6e-4`.
+GD remained far from stationarity after 200 iterations. Newton-CG and
+trust-krylov reached essentially the same objective with gradient norms down to
+approximately `1e-8`--`1e-7`, but required hundreds of HVPs and about
+`5`--`6.5` seconds per run. The converged BFGS Hessian contained one near-zero
+eigenvalue (`~9.8e-13`), with that direction entirely in the `sigma_v` block.
+One fitted measurement variance was simultaneously driven extremely close to
+zero.
+
+For `larger_n6` (`T=100`, `p=24`), both BFGS runs again reported success,
+reaching NLL `-1764.6018036` with gradient norms below about `5.1e-7` in
+roughly `1.1`--`1.3` seconds. In contrast, both L-BFGS-B runs reached the
+200-iteration limit. Their NLL values (`-1764.60017` and `-1764.59937`) were
+close to the BFGS value, but their gradient norms (`0.072` and `0.213`) showed
+that they had not reached the same stationary-point tolerance. GD also remained
+far from stationarity.
+
+Newton-CG and trust-krylov recovered essentially the same `p=24` objective as
+BFGS from both starts. Newton-CG used `589`--`660` HVPs and took about
+`22.9`--`23.5` seconds; trust-krylov used `490`--`496` HVPs and took about
+`17.8`--`18.4` seconds. Their much larger wall times relative to BFGS reflect
+the cost of repeatedly obtaining exact curvature products rather than a failure
+of the HVP implementation.
+
+At the converged `p=24` BFGS solution, two Hessian eigenvalues were near zero
+(`5.75e-13` and `8.19e-13`) while the remaining 22 were materially positive.
+The corresponding weakest directions were concentrated almost completely in
+the measurement-variance block, and two fitted measurement variances were
+driven close to the positive-transform boundary. This is evidence of local flat
+curvature/boundary behavior in this synthetic realization. It is not, by
+itself, evidence of formal non-identifiability or of global likelihood
+geometry.
+
+### Interpretation
+
+The measurements do not support a single solver as uniformly preferable.
+For the dimensions studied here (`p<=24`), dense BFGS storage is small and BFGS
+provided a strong combination of runtime, final objective and common gradient
+norm. L-BFGS-B retained its memory advantage but its native stopping rule could
+declare success before the common gradient criterion was met, and at `p=24` it
+hit the iteration limit from both starts. Newton-CG and trust-krylov demonstrate
+that exact curvature information can be used without a dense Hessian or inverse
+and can produce very small final gradients, but repeated HVPs made them more
+expensive in these modest-dimensional tests. Fixed-step GD was consistently the
+weakest optimization baseline.
+
+The most important diagnostic finding is that the likelihood can contain
+strongly different curvature scales, locally indefinite starts, and nearly flat
+measurement-variance directions. These observations motivate retaining
+curvature diagnostics and provide a characterized deterministic baseline for
+#11. They do not yet establish how the methods behave on real market data,
+very large parameter vectors, unresolved parameter-tying conventions, or the
+PDF's noisy-optimization regime.
 
 ## Limits
 
