@@ -43,7 +43,8 @@ The usual first steps are:
 1. Install the required Python and project dependencies using the setup below.
 2. Run the test suite to verify the local environment.
 3. Read the relevant document in `docs/` before changing model behavior.
-4. Make changes on a feature branch and open a pull request for review.
+4. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before making changes or opening
+    a pull request.
 
 ### Run tests
 
@@ -70,39 +71,9 @@ After installing the project, run the synthetic validation example with:
 .\.venv\Scripts\python.exe examples\synthetic_validation.py
 ```
 
-### Development workflow
-
-Create a branch before making changes:
-
-```powershell
-git switch -c feature/short-description
-```
-
-Before opening a pull request, run the relevant tests and inspect the working
-tree:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest
-git status
-git diff
-```
-
-Keep commits focused and explain behavior changes in the pull request. Pull
-requests should include the tests that were run and any known limitations.
-
-## Project structure
-
-```text
-src/kalmanfilter/   Package implementation
-tests/              Unit, numerical, and integration tests
-docs/               Mathematical and implementation documentation
-examples/           Runnable validation examples
-benchmarks/         Benchmark scripts and recorded results
-roadmap.md          Planned work and unresolved questions
-```
-
-The module-level documentation in `docs/` is the source of truth for equations
-and model contracts. Update documentation and tests when those contracts change.
+For contributor workflow, coding conventions, and pull request requirements,
+see [`CONTRIBUTING.md`](CONTRIBUTING.md). The repository structure and detailed
+agent guidance are documented in [`AGENTS.md`](AGENTS.md).
 
 ## Reproducible setup
 
@@ -198,9 +169,6 @@ Get-ChildItem .venv -Recurse -File | Unblock-File
 The first test run can take several minutes because JAX compiles numerical
 functions. Source changes are available immediately because the package is
 installed in editable mode.
-
-For a fresh environment without deleting an existing `.venv`, select another
-environment directory before running the same sync and test commands:
 
 ```powershell
 # Windows PowerShell; applies to this terminal session
