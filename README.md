@@ -74,6 +74,44 @@ After installing the project, run the synthetic validation example with:
 .\.venv\Scripts\python.exe examples\synthetic_validation.py
 ```
 
+### Run benchmarks
+
+The benchmark scripts use deterministic synthetic problems and print timing,
+optimization, scaling, and conditioning results to the terminal. They are
+diagnostic studies, not market-data calibration or performance guarantees.
+Detailed methodology is documented in `docs/baseline_optimization.md`,
+`docs/fixed_scan_scaling.md`, and `docs/curvature_optimization.md`.
+
+On Windows ARM64, use the x64-Python virtual environment described in the
+[Windows ARM64 setup](#windows-arm64) section:
+
+```powershell
+.\.venv\Scripts\python.exe benchmarks\baseline_optimization.py --dates 24
+.\.venv\Scripts\python.exe benchmarks\fixed_scan_scaling.py
+.\.venv\Scripts\python.exe benchmarks\curvature_optimization.py
+```
+
+Start with the baseline benchmark. The other two can take considerably longer,
+especially during the first JAX compilation. Useful smaller runs include:
+
+```powershell
+.\.venv\Scripts\python.exe benchmarks\baseline_optimization.py --dates 24
+.\.venv\Scripts\python.exe benchmarks\curvature_optimization.py --case reference --repeats 1
+```
+
+On other platforms with the standard uv environment, run the equivalent
+commands from the repository root:
+
+```bash
+uv run --locked python benchmarks/baseline_optimization.py --dates 24
+uv run --locked python benchmarks/fixed_scan_scaling.py
+uv run --locked python benchmarks/curvature_optimization.py
+```
+
+Benchmark output is printed to the terminal. Existing reference outputs are
+stored under `benchmarks/results/`; do not overwrite them unless the benchmark
+change intentionally updates the recorded baseline.
+
 For contributor workflow, coding conventions, and pull request requirements,
 see [`CONTRIBUTING.md`](CONTRIBUTING.md). The repository structure and detailed
 agent guidance are documented in [`AGENTS.md`](AGENTS.md).
