@@ -57,7 +57,7 @@ From the repository root, run:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-The full suite contains numerical and JAX compilation tests. The first run can
+The full suite contains numerical, and JAX compilation tests. The first run can
 take several minutes; a successful run ends with a summary such as `489 passed`.
 For a focused check, pass a test file or keyword, for example:
 
