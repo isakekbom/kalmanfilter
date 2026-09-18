@@ -152,7 +152,7 @@ uv sync --locked --extra test
 uv run --locked --extra test pytest
 ```
 
-`uv sync` creates `.venv` and installs this package in **editable mode** along with
+`uv sync` creates `.venv`, and installs this package in **editable mode** along with
 the test extra. Source edits take effect without reinstalling. `--locked` rejects
 an out-of-date lockfile rather than updating dependency resolution. No activation
 script, `PYTHONPATH` adjustment, or local source-path injection is required.
