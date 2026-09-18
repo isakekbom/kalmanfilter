@@ -26,6 +26,7 @@ from kalmanfilter.optimization import CompiledObjective, run_optimization
 from kalmanfilter.params import ModelParameters, ParameterLayout, pack_parameters, unpack_parameters
 from kalmanfilter.synthetic import SyntheticStepInputs, generate_synthetic_dataset
 from kalmanfilter.transition import DiagonalMatrix, StateCoordinates, StructuralStep, selection_map
+from kalmanfilter.noisy_optimization import create_test_cloud, solve_noise_fixed_point
 
 
 METHODS = ("BFGS", "L-BFGS-B", "GD", "Newton-CG", "trust-krylov")
@@ -248,7 +249,7 @@ def regression_anchor(runs):
          source="historical rounded #10 stdout; same problem/starts, current scan execution")
 
 
-def benchmark(problem, repeats):
+def benchmark(problem, repeats, noisy_preprocess=False):
     p, t = problem.layout.n_parameters, problem.batch.n_steps
     emit("PROBLEM", name=problem.name, T=t, p=p, n_x=len(problem.initial.state),
          n_z=problem.batch.observations.shape[1], starts=problem.starts, generating_raw=problem.true_raw,
@@ -281,7 +282,49 @@ def benchmark(problem, repeats):
             evaluations, hvps = compiled.total_evaluations, compiled.total_hvp_evaluations
             begun = perf_counter()
             try:
-                result = run_optimization(compiled, start, method=method, learning_rate=rate)
+                if noisy_preprocess:
+                    # Preprocess this explicit start with noisy local cloud and fixed-point
+                    try:
+                        center = np.asarray(start, dtype=float)
+                        m_cloud = 20
+                        scale = 1e-3
+                        x_cloud, delta_x = create_test_cloud(center, m_points=m_cloud, scale=scale)
+                        # Evaluate objective value and gradient at each cloud point
+                        f_vals = []
+                        g_vals = []
+                        for pt in x_cloud:
+                            v, g = compiled.evaluate(pt)
+                            f_vals.append(v)
+                            g_vals.append(g)
+                        f_vals = np.asarray(f_vals)
+                        g_vals = np.asarray(g_vals)
+                        # Build a trivial single-zone delta_x_dict where A_i are zeros
+                        p = center.size
+                        I_k = list(range(len(x_cloud)))
+                        a_i = {i: delta_x[i] for i in range(len(x_cloud))}
+                        A_zero = {i: np.zeros((p, p)) for i in range(len(x_cloud))}
+                        delta_x_dict = {0: {'I_k': I_k, 'dim_y': p, 'a_i': a_i, 'A_i': A_zero}}
+                        weights = {'w_xi': 1.0, 'w_g_xi': 0.0, 'w_e': 1.0, 'w_g_e': 1.0}
+                        e, e_bar = solve_noise_fixed_point(f_vals, g_vals, delta_x_dict, weights)
+                        # Use centre corrections to build a small affine correction term
+                        e0 = float(e[0])
+                        ebar0 = np.asarray(e_bar[0], dtype=float)
+                        def adjusted_objective(raw):
+                            raw = jnp.asarray(raw, dtype=jnp.float64)
+                            center_j = jnp.asarray(center, dtype=jnp.float64)
+                            base = problem.objective(raw)
+                            correction = e0 + jnp.dot(raw - center_j, ebar0)
+                            return base - correction
+                        # Compile an adjusted objective that removes estimated bias
+                        compiled_adj = CompiledObjective(adjusted_objective, problem.true_raw)
+                    except Exception as exc:
+                        emit("NOISY_PREPROCESS_FAILURE", problem=problem.name, method=method, start=index,
+                             message=str(exc))
+                        compiled_adj = compiled
+
+                    result = run_optimization(compiled_adj, start, method=method, learning_rate=rate)
+                else:
+                    result = run_optimization(compiled, start, method=method, learning_rate=rate)
             except (checkify.JaxRuntimeError, ValueError, FloatingPointError) as error:
                 emit("RUN_FAILURE", problem=problem.name, method=method, start=index,
                      exception_type=type(error).__name__, message=str(error), initial_raw=start,
@@ -302,7 +345,7 @@ def benchmark(problem, repeats):
     else:
         emit("DIAGNOSTIC_UNAVAILABLE", problem=problem.name, point="converged_BFGS",
              reason="No BFGS run reported success; no converged point is fabricated.")
-    if problem.name == "reference_T24":
+    if problem.name == "reference_T24" and not noisy_preprocess:
         regression_anchor(runs)
     emit("CASE_COMPLETE", problem=problem.name, completed_runs=len(runs), expected_runs=len(METHODS) * len(problem.starts),
          total_value_gradient_dispatches=compiled.total_evaluations,
@@ -316,6 +359,8 @@ def main():
     choices = ("all", "reference", "long100", "long1000", "long5000", "larger3", "larger6")
     parser.add_argument("--case", choices=choices, default="all")
     parser.add_argument("--repeats", type=int, default=5)
+    parser.add_argument("--noisy-preprocess", action="store_true", default=False,
+                        help="Enable local cloud AD + fixed-point noise preprocessing before optimization")
     args = parser.parse_args()
     if args.repeats < 1:
         parser.error("--repeats must be positive")
@@ -335,10 +380,10 @@ def main():
         reference = make_problem(max(lengths[key] for key in selected))
         batch = stack_fixed_inputs(reference.dataset.inputs)
         for key in selected:
-            benchmark(reference_case(reference, batch, lengths[key]), args.repeats)
+            benchmark(reference_case(reference, batch, lengths[key]), args.repeats, noisy_preprocess=args.noisy_preprocess)
     for size in (3, 6):
         if args.case in ("all", f"larger{size}"):
-            benchmark(make_larger_problem(size), args.repeats)
+            benchmark(make_larger_problem(size), args.repeats, noisy_preprocess=args.noisy_preprocess)
     emit("COMPLETE", case=args.case, remat=False, noisy_optimization=False)
 
 
