@@ -42,6 +42,15 @@ uv.lock             Locked dependency resolution for the uv workflow
 - `optimization.py` contains the optimizer boundary and optimization traces.
 - `fixed_scan.py` provides the fixed-shape `jax.lax.scan` likelihood path.
 
+### Benchmark scripts
+
+- `benchmarks/benchmark_config.py` is the shared, serializable
+  `BenchmarkConfig` layer (families, presets, builders, CLI flags) used by
+  `baseline_optimization.py`, `fixed_scan_scaling.py` and
+  `curvature_optimization.py`. The scripts are standalone; run them from the
+  repository root. Tests import the module by name because `pyproject.toml`
+  adds `benchmarks` to the pytest `pythonpath`.
+
 ### Documentation map
 
 Use the document closest to the behavior being changed:
@@ -56,6 +65,9 @@ Use the document closest to the behavior being changed:
 - `docs/synthetic.md` for synthetic data and end-to-end validation.
 - `docs/fixed_scan_scaling.md` for the fixed-shape scan implementation.
 - `docs/baseline_optimization.md` for optimization workflows and benchmarks.
+- `docs/curvature_optimization.md` for HVP-based methods and conditioning.
+- `docs/benchmark_config.md` for benchmark scenario configuration, presets,
+  configurable fields and their units.
 
 When a mathematical contract changes, update the relevant documentation and
 focused tests in the same change. Keep `README.md` focused on onboarding and

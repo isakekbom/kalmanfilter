@@ -112,6 +112,19 @@ Benchmark output is printed to the terminal. Existing reference outputs are
 stored under `benchmarks/results/`; do not overwrite them unless the benchmark
 change intentionally updates the recorded baseline.
 
+The default arguments reproduce the documented reference cases. Series length,
+model size, noise levels, seed, starts, timing repeats and solver subset can be
+varied from the command line or a JSON configuration file without editing the
+scripts; every run prints its complete resolved configuration. For example:
+
+```bash
+uv run --locked python benchmarks/curvature_optimization.py --case larger3     --states 10 --dates 1000 --observation-variance-scale 5 --process-variance-scale 2 --seed 123
+uv run --locked python benchmarks/baseline_optimization.py --dates 48 --observation-variance-scale 0.25 --methods BFGS
+```
+
+The configurable fields, their units and the named presets are documented in
+`docs/benchmark_config.md`.
+
 For contributor workflow, coding conventions, and pull request requirements,
 see [`CONTRIBUTING.md`](CONTRIBUTING.md). The repository structure and detailed
 agent guidance are documented in [`AGENTS.md`](AGENTS.md).

@@ -10,6 +10,12 @@ optimization after the [full-gradient checks](gradient_validation.md) and
 [`optimization.py`](../src/kalmanfilter/optimization.py); it does not change
 pricing, transitions, EKF, likelihood, parameter transforms, or generation.
 
+The problem builder now lives in the shared configuration layer described in
+[benchmark_config.md](benchmark_config.md); `make_problem(n_dates, seed)` is a
+thin wrapper over the `reference` preset and reproduces the original builder
+bitwise. The command-line flags documented there vary the series length, noise
+levels, seed, starts and solver subset without changing the defaults below.
+
 ## Objective and methods
 
 The estimation objective is

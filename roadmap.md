@@ -51,6 +51,10 @@ For every issue:
 
 These completed issues establish the deterministic baseline used by all research work below.
 
+## Shared benchmark infrastructure
+
+- **#44** Configurable synthetic benchmark scenarios (`benchmarks/benchmark_config.py`, named presets, CLI/config-file support) — **completed**; #33, #36, #39 and #40 should define their experiments through `BenchmarkConfig` rather than new hard-coded builders.
+
 ---
 
 # Current parallel workstreams
